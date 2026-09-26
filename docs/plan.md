@@ -59,7 +59,7 @@ Files on each bot host, all under the client's `Game/data/lua/autoconf/custom/`.
 
 | Path | Owner |
 |---|---|
-| `ArchHUD.conf`, `archhud/` | samedicorp ArchHUD 2.105, pinned to commit `6c95222`, unmodified |
+| `ArchHUD.conf`, `archhud/` | The-Third-Verse/ArchHUD 2.105, modular master build, pinned to commit `6c95222`, unmodified |
 | `archhud/userclass.lua` | Ours: a short shim that loads the bus |
 | `dufleet/` | Ours: the bot bus |
 | `dufleet/inbox.lua` | Written by the companion, only with Transport F |
@@ -72,11 +72,11 @@ You run the in-game part. Claude prepares the probes under `spikes/` (a probe `u
 |---|---|---|
 | S9 | Does the server admin permit client-side automation, including screen capture and keystroke or file-based commands? Get it in writing | go-live |
 | S8 | Where does the myDU client keep `Game/data/lua` and its logs? Is EQU8 present? Can login be automated? CPU, RAM and GPU per client; FPS cap vs timer resolution | install, watchdog, sizing |
-| A1 | Does ArchHUD 2.105 install from local files and fly on the target server? Check a pilot seat and a remote controller, a custom atlas if the server needs one, and an autopilot trip to a pasted `::pos` on the same planet and on another planet | D1 |
+| A1 | Does the modular ArchHUD 2.105 build (The-Third-Verse master, not `BetaStandalone`) install from local files and fly on the target server? Check a pilot seat and a remote controller, a custom atlas if the server needs one, and an autopilot trip to a pasted `::pos` on the same planet and on another planet | D1 |
 | A2 | Does the probe `userclass.lua` work? `ExtraOnStart` fires; the wrapped `PROGRAM.controlInput` sees `/b` lines before ArchHUD; a `dub` timer ticks through the wrapped `PROGRAM.onTick`; `userScreen` content shows | D1 |
 | S11 | Are `package`, `package.loaded`, `load`, `loadfile` or `dofile` reachable? Does a re-`require` pick up a file the companion changed at runtime? How fast, and at what instruction cost? | D3 |
 | S0 | Does `system.print` reach the disk log? Latency, maximum line length, escaping, file naming and rotation. Confirm `io` and `os` are absent. Prior: probably not | D2 |
-| S1 | Is the 48×24 optical grid, drawn through `userScreen`, legible at the pinned resolution and HUD scale, and clear of ArchHUD's own elements? Decode error rate, instruction cost | D2 |
+| S1 | Is the 48×24 optical grid, drawn through `userScreen`, legible at the pinned resolution and HUD scale, and clear of ArchHUD's own elements? Decode error rate, instruction cost. If the HUD overlay is unreliable, the fallback is a screen unit; ArchHUD's `content/test-pattern*.svg` measure a screen's pixel accuracy | D2 |
 | S3 | Chat open key, tab persistence, input length limit, behaviour with menus open. Needed for login and UI work even if S11 passes | injector |
 | S4 | Unicode `SendInput` vs scan codes; an elevated client (UIPI); a locked or disconnected session; the idle check vs the companion's own input | injector |
 | S10 | Instruction headroom of ArchHUD plus the bus over 2 h, parked and in flight (`getInstructionCount`/`getInstructionLimit`) | Phase 2 |
@@ -283,7 +283,7 @@ Acceptance, unchanged from the handoff:
 
 ## Open questions for you
 
-1. Which myDU server will the bots run on, and does it use a custom atlas (changed planets)? This sets ArchHUD's `customAtlas` and the dashboard map.
+1. Which myDU server will the bots run on (The Third Verse?), and does it use a custom atlas (changed planets)? This sets ArchHUD's `customAtlas` and the dashboard map.
 2. Supabase: a new hosted project, an existing one, or self-hosted?
 3. Fleet size and hosts: spare PCs, Hyper-V GPU-P VMs, or cloud instances?
 4. The `Ai helper/` folder: keep it, remove it, or give it a purpose?
@@ -294,5 +294,5 @@ Acceptance, unchanged from the handoff:
 2. **Claude:** build the Phase 0 kit in `spikes/`:
    - a probe `userclass.lua` covering A2, S11, S0 and S1, all in one in-game session;
    - host scripts for the log grep, the inbox write, dxcam capture and a SendInput test.
-3. **You:** install ArchHUD 2.105 on one ship, run A1 and the probes, and paste the results.
+3. **You:** install the modular ArchHUD 2.105 from The-Third-Verse/ArchHUD on one ship, run A1 and the probes, and paste the results.
 4. **Claude:** write ADR-0001. In parallel, start Phase 1 workstreams 1–3 and the transport-independent parts of 4–6.

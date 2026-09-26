@@ -28,8 +28,10 @@ Transports (ADR-0001 pending):
   - C: chat keystrokes, "/b <cseq> <verb> ... #<crc16>", with the CRC over the UTF-8 bytes between "/b " and " #".
 - Server mods (system.modAction, CPPMod.*) are out of scope (ADR-0003).
 
-ArchHUD (samedicorp fork 2.105, commit 6c95222, GPL-3.0):
+ArchHUD (The-Third-Verse/ArchHUD 2.105, modular master build, commit 6c95222, GPL-3.0; samedicorp/ArchHUD is the
+same commit):
 - Installed as local files under Game/data/lua/autoconf/custom/ (ArchHUD.conf plus archhud/). No paste-size limit applies.
+- The BetaStandalone branch is a single-file build with no userclass hook. Never use it for bots.
 - archhud/userclass.lua is loaded last. userBase.ExtraOnStart/Stop/Update/Flush run at the end of each event;
   userX.fn replaces a class function by name.
 - The global userScreen is added to ArchHUD's setScreen content. Nothing else may call system.setScreen on that unit.
@@ -82,5 +84,5 @@ Game files:
 
 ## When unsure
 - DU API behaviour not in the Codex or du-mocks: add a spike to docs/spikes.md; do not guess.
-- ArchHUD behaviour: read the pinned fork's source (samedicorp/ArchHUD at 6c95222), not the user manual.
+- ArchHUD behaviour: read the pinned source (The-Third-Verse/ArchHUD at 6c95222), not the user manual.
 - Small testable modules; a fixture for every parser.

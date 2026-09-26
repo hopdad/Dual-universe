@@ -242,11 +242,12 @@ Checked after the owner picked ArchHUD ([ADR-0002](adr/0002-archhud-extension.md
 | Repository | Commit | Date | Note |
 |---|---|---|---|
 | Archaegeo/Archaegeo-Orbital-Hud | da394e5 | 2023-10-02 | Upstream, version 2.103. Every branch ends in 2023 or earlier |
-| samedicorp/ArchHUD | 6c95222 | 2025-09-11 | Fork, version 2.105 ("MyDU update"). Last code change 2024-11-15; the 2025 commit only deleted a zip |
+| The-Third-Verse/ArchHUD | 6c95222 | 2025-09-11 | The version the owner uses. Master is version 2.105 ("MyDU update"); last code change 2024-11-15, and the 2025 commit only deleted a zip. Other branches: `BetaMod` (2024-11-09) and `BetaStandalone` (2024-11-15), which is a single 231 KB config, version 0.105, without the `userclass` hook |
+| samedicorp/ArchHUD | 6c95222 | 2025-09-11 | Same commit as The-Third-Verse/ArchHUD master; working trees compared identical |
 | wolfe-labs/DU-ArchHUD | 2e59c74 | 2023-06-26 | Archive of upstream |
 | Zer0Krypt/ArchHUD-MPRN | af64b8f | 2021-12-10 | Stale fork |
 
-Line numbers below refer to the samedicorp fork.
+Line numbers below refer to commit 6c95222, The-Third-Verse/ArchHUD master.
 
 | Fact | Evidence |
 |---|---|
@@ -266,7 +267,7 @@ Line numbers below refer to the samedicorp fork.
 | Other callable autopilot functions: `BrakeToggle`, `ResetAutopilots`, `ToggleAltitudeHold`, `ToggleIntoOrbit`, `BeginReentry`, `ToggleVerticalTakeoff`, `routeWP`, `cmdThrottle`, `cmdCruise` | `apclass.lua` |
 
 Not verified here, moved to spikes:
-- ArchHUD 2.105 installs and flies on the target server (A1).
+- The modular ArchHUD 2.105 build installs and flies on the target server (A1).
 - The `userclass` shim can wrap chat and timers as described (A2).
 - The myDU client's install path for local Lua files (S8).
 - Instruction headroom with the bus inside ArchHUD's unit (S10).

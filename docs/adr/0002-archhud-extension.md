@@ -12,11 +12,14 @@
   - It loads an optional `archhud/userclass.lua` last. That file can add code to the end of start, stop, update and flush (`userBase.ExtraOn*`), and replace any class function by name (`userAP`, `userControl`, `userHud`, ...).
   - A global `userScreen` is added to the content ArchHUD passes to `system.setScreen`.
   - Its autopilot covers standard ships as well as VTOL: same-planet travel with altitude hold and landing, planet-to-planet flight, orbit, reentry and routes.
-- Upstream (Archaegeo, 2.103) has had no commits since 2023-10-02. The samedicorp fork (2.105) adds myDU changes: a custom atlas, new fuel tank types, and a property-saving fix. Its last code change was 2024-11-15.
+- Upstream (Archaegeo, 2.103) has had no commits since 2023-10-02.
+- The owner uses The-Third-Verse/ArchHUD. Its master branch is version 2.105, which adds myDU changes: a custom atlas, new fuel tank types, and a property-saving fix. Its last code change was 2024-11-15.
+- samedicorp/ArchHUD master is the same commit, with an identical tree.
+- Its `BetaStandalone` branch is a different build: one 231 KB config (version 0.105) with no `userclass` hook.
 
 ## Decision
 
-1. Flight script: ArchHUD, from the samedicorp fork, pinned to commit `6c95222`.
+1. Flight script: ArchHUD 2.105 from The-Third-Verse/ArchHUD, the modular master build, pinned to commit `6c95222`. Not `BetaStandalone`, which has no hook for our code.
 2. The bot bus runs inside the ArchHUD control unit. ArchHUD itself stays unmodified:
    - a small `archhud/userclass.lua` shim requires our modules from `autoconf/custom/dufleet/`;
    - at start, the shim wraps `PROGRAM.controlInput` (chat) and `PROGRAM.onTick` (our own timer tag).
