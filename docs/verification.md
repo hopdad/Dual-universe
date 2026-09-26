@@ -2,6 +2,8 @@
 
 Checked on 2026-09-26 against [the handoff](handoff/original-handoff.md). Where the two disagree, this report wins. [plan.md](plan.md) is built on it.
 
+> Update, same day: the project owner chose the client-only track ([ADR-0003](adr/0003-client-only-track.md)) and ArchHUD as the flight script ([ADR-0002](adr/0002-archhud-extension.md)). ArchHUD was verified in the [addendum](#addendum-archhud). The Saga findings below are still true, but they no longer drive the plan. Finding 1 (server mods) is out of scope for now.
+
 ## How it was checked
 
 | Area | Method |
@@ -217,11 +219,11 @@ Run by [sql/run.sh](verification/sql/run.sh). "Handoff" is migrations 0001–000
 
 - Does `system.print` reach the disk log? (S0)
 - The myDU client's log folder, whether EQU8 ships with it, and login automation (S8)
-- `onInputText` fan-out across units, and whether a sidecar PB keeps running and receiving chat while the avatar sits in Saga's chair (S2)
+- `onInputText` fan-out across units, and whether a sidecar PB keeps running and receiving chat while the avatar sits in Saga's chair (S2; dropped by ADR-0002, since the bus now runs inside ArchHUD's unit)
 - Chat key and input length limit (S3); Unicode `SendInput` vs scan codes (S4)
 - Emitter behaviour through relays, and real ranges (S5); PB proximity radius (S6)
 - CPU quota numbers with Saga running (S10)
-- `system.modAction` size and rate limits, and whether plug-started units may call it (M1); which events `luaElementEmitEvent` can raise (M2)
+- `system.modAction` size and rate limits, and whether plug-started units may call it (M1); which events `luaElementEmitEvent` can raise (M2). Both dropped by ADR-0003 (no server mods)
 - du-socket internals: not needed while the protocol keeps its own framing
 
 ## Reproduce
@@ -232,3 +234,39 @@ docs/verification/luac/run.sh   # needs Node 18+ and the npm registry
 ```
 
 Saga size check: clone tobitege/du-saga, copy `lua/saga.lua` to `lua/Saga.lua`, run `npx -p @wolfe-labs/du-luac@1.3.5 du-lua build`, then `ls -l out/release`.
+
+## Addendum: ArchHUD
+
+Checked after the owner picked ArchHUD ([ADR-0002](adr/0002-archhud-extension.md)).
+
+| Repository | Commit | Date | Note |
+|---|---|---|---|
+| Archaegeo/Archaegeo-Orbital-Hud | da394e5 | 2023-10-02 | Upstream, version 2.103. Every branch ends in 2023 or earlier |
+| samedicorp/ArchHUD | 6c95222 | 2025-09-11 | Fork, version 2.105 ("MyDU update"). Last code change 2024-11-15; the 2025 commit only deleted a zip |
+| wolfe-labs/DU-ArchHUD | 2e59c74 | 2023-06-26 | Archive of upstream |
+| Zer0Krypt/ArchHUD-MPRN | af64b8f | 2021-12-10 | Stale fork |
+
+Line numbers below refer to the samedicorp fork.
+
+| Fact | Evidence |
+|---|---|
+| Licensed GPL-3.0 | `LICENSE` |
+| Modular: a 31 KB `ArchHUD.conf` plus about 467 KB of modules, loaded with `require` from `autoconf/custom/archhud/`. Does not run on GeForce Now | README; `src/ArchHUD.lua:160-163`; `wc -c src/requires/*.lua` |
+| myDU changes: a custom atlas (the `customAtlas` parameter loads `autoconf/custom/<name>`), detection of new fuel tank types including anti-gravity fuel, and a fix for property saving | `ChangeLog.md` (2.104, 2.105); `src/ArchHUD.lua:15,153` |
+| `archhud/userclass.lua` is loaded last, through `pcall(require, ...)` | `src/ArchHUD.lua:160-163`; `src/requires/userclass.example` |
+| `userBase.ExtraOnStart`, `ExtraOnUpdate`, `ExtraOnFlush` and `ExtraOnStop` run at the end of each event | `baseclass.lua:590,664,679,723` |
+| Overrides replace class functions by name, at the end of each constructor | `baseclass.lua:783`, `apclass.lua:3071`, `atlasclass.lua:981`, `controlclass.lua:826`, `hudclass.lua:2970` |
+| `userScreen` is added to the HUD content. `setScreen` is only called when the content changes | `hudclass.lua:2107`; `baseclass.lua:654-655` |
+| Timers: `apTick` at 60 Hz, `hudTick` at 15 Hz by default, `tenthSecond`, `oneSecond`. `program.onTick` ignores tags it does not know | `baseclass.lua:584-587,759`; `src/ArchHUD.lua:139` |
+| Chat path: `script.onInputText` → `PROGRAM.controlInput` → `CONTROL.inputTextControl`, only after setup completes | `ArchHUD.conf` (`script.onInputText`); `baseclass.lua:745` |
+| Unknown commands are ignored, but any chat line containing `::pos` is handled as add-waypoint. Adding waypoints is refused while the autopilot is on | `controlclass.lua:596,658,672` |
+| Errors in handlers are printed but do not stop the unit | `ArchHUD.conf:58` (`__wrap_lua__stopOnError=false`) |
+| In-process goto: a temporary location sets `AutopilotTargetIndex = 1`, then `ap.ToggleAutopilot()` engages. Same planet in atmosphere: vector to target with altitude hold. Space target: launch, then autopilot. Routes go through `apRoute` | `atlasclass.lua:864,889`; `apclass.lua:472-561` |
+| Two `ToggleAutopilot` calls within 1.5 s in atmosphere count as a double click (orbital hop altitude) | `apclass.lua:498` |
+| Other callable autopilot functions: `BrakeToggle`, `ResetAutopilots`, `ToggleAltitudeHold`, `ToggleIntoOrbit`, `BeginReentry`, `ToggleVerticalTakeoff`, `routeWP`, `cmdThrottle`, `cmdCruise` | `apclass.lua` |
+
+Not verified here, moved to spikes:
+- ArchHUD 2.105 installs and flies on the target server (A1).
+- The `userclass` shim can wrap chat and timers as described (A2).
+- The myDU client's install path for local Lua files (S8).
+- Instruction headroom with the bus inside ArchHUD's unit (S10).

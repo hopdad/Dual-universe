@@ -1,117 +1,126 @@
 # Development plan
 
-Built on [the handoff](handoff/original-handoff.md) as corrected by [verification.md](verification.md). Where they disagree, this plan and the verification report win.
+Built on [the handoff](handoff/original-handoff.md) as corrected by [verification.md](verification.md), plus the owner's decisions of 2026-09-26:
 
-## What changes from the handoff
+- client-only, no server mods ([ADR-0003](adr/0003-client-only-track.md));
+- ArchHUD as the flight script, with the bot code running inside it ([ADR-0002](adr/0002-archhud-extension.md)).
 
-1. **A server-access gate comes first.** myDU has a native Lua-to-server call (`system.modAction`). Server mods can also push JavaScript to a client that raises Lua events there (`CPPMod.luaElementEmitEvent`). Where a mod can be installed, that replaces the log tail, the optical frame and the keystroke injector. The plan therefore has two transport tracks:
-   - Track M (mod-assisted), used where a mod can be installed.
-   - Track C (client-only), the handoff's design.
-2. **The bus runs beside Saga, not inside it.** Saga's release build uses 99% of the 200,000-byte paste limit and owns the HUD. The preferred topology is a sidecar programming board next to an unmodified Saga. A trimmed Saga fork is the fallback if spike S2 fails.
-3. **Transport-independent work starts now.** The protocol, the hub schema, the dashboard, and the Lua and companion cores don't depend on the spikes. Only the transport adapters wait for the ADRs. (The handoff blocked all of Phase 1 on S0.)
-4. **The spec's artifacts are corrected:**
-   - the `project.json` format;
-   - the schema, with the `0005_fixes.sql` changes plus a lease and recovery RPC;
-   - `proxy.ts` instead of `middleware.ts`;
-   - the protocol gaps (bounded split, chat CRC scope, watermark dedupe with an epoch).
-5. **Later phases are re-scoped:**
-   - The `goto` acceptance depends on flight mode.
-   - `mine_loop` monitors and hauls; calibration is a UI task.
-   - Plug-started worker boards report over emitters only.
-   - The vision loop uses Anthropic's computer-use toolset.
-   - On track M, market work moves server-side.
+Where these documents disagree with the handoff, they win.
 
 ## Decision gates
 
-| Gate | Question | Decided by | Options (preferred first) |
-|---|---|---|---|
-| D0 | Can a DLL mod run on the target server(s)? | You: server admin, or the admin's written consent | M (mod-assisted) or C (client-only). Both may apply on different servers |
-| D1 | Where does the bot bus run? | S2, S1b, S10 | Sidecar PB beside unmodified Saga, or trimmed Saga fork |
-| D2 | Telemetry out | D0, then M1 or S0/S1 | M (`system.modAction`), then L (log tail), then O (optical HUD frame) |
-| D3 | Commands in | D0, then M2 or S3/S4 | M (mod-raised Lua event), then C (chat keystrokes) |
+| Gate | Question | Status |
+|---|---|---|
+| D0 | Can a server mod run? | Decided: no. Client-only ([ADR-0003](adr/0003-client-only-track.md)) |
+| D1 | Which flight script, and where does the bot code run? | Decided: inside ArchHUD's unit, through its `userclass.lua` hook ([ADR-0002](adr/0002-archhud-extension.md)). Confirm in A1, A2 and S10 |
+| D2 | Telemetry out | Open: L (log tail) if S0 passes, otherwise O (optical frame drawn through `userScreen`) |
+| D3 | Commands in | Open: F (a local file the bus re-reads) if S11 passes, otherwise C (chat keystrokes) |
 
-Each gate ends in an ADR: ADR-0001 transport (D2, D3), ADR-0002 Lua topology (D1), ADR-0003 server track (D0).
+ADR-0001 will record D2 and D3.
+
+## What changes from the handoff
+
+1. **Client-only.** Everything runs on the bot's own PC or VM. No server mods, no server-side APIs.
+2. **ArchHUD instead of a Saga fork.** ArchHUD makes room for our code in three ways:
+   - it loads its code from local files, so there is no paste-size limit;
+   - it loads an optional extension file (`userclass.lua`) last, so the bus goes in without modifying ArchHUD;
+   - it adds a `userScreen` string to its HUD, which gives the optical frame a slot.
+
+   Its autopilot also flies standard ships and between planets, not only VTOL hops.
+3. **Possibly no keystrokes for commands.** The game might let Lua re-`require` a local file after it changes (spike S11). If so, the companion writes commands into a small data file under `autoconf/custom/dufleet/`, and the bus polls it (Transport F). Keystroke injection would then be needed only for login and UI tasks. This spike is cheap and has the biggest payoff, so it runs early.
+4. **Transport-independent work starts now:** the protocol, the hub schema, the dashboard, and the Lua and companion cores.
+5. **The spec's artifacts are corrected** per the verification:
+   - the schema fixes, plus a lease and recovery RPC;
+   - `proxy.ts` instead of `middleware.ts`;
+   - the protocol gaps (bounded split, command CRC scope, watermark dedupe with an epoch).
 
 ## Target architecture
 
 ```
-        per bot: one Windows 10/11 host or VM running one myDU client
-   ┌──────────────────────────────────────────────────────────────────┐
-   │  pilot seat ── Saga (upstream build, untouched, GPL-3.0)         │
-   │  bus PB ────── ours: dispatcher, skills, collectors, outbox       │
-   │  companion ─── launcher, login, watchdog                         │
-   │                track C adds: chat injector, log or HUD ingest    │
-   └──────────┬───────────────────────────────────────┬───────────────┘
-   track M:   │ system.modAction  ↑                    │ track C:
-              │ luaElementEmitEvent ↓                  │ log tail or HUD frame ↑
-   ┌──────────┴──────────────┐                         │ chat keystrokes ↓
-   │ myDU server + ModDuFleet │                         │
-   └──────────┬──────────────┘                         │
-              └──────────────►  Supabase hub  ◄────────┘
-                                  ▲       ▲
-                           dashboard     planner (Claude API)
+          per bot: one Windows 10/11 host or VM running one myDU client
+   ┌────────────────────────────────────────────────────────────────────┐
+   │ myDU client                                                        │
+   │   pilot seat or remote controller: ArchHUD 2.105 (pinned, as-is)   │
+   │     └─ archhud/userclass.lua ─ requires ─ dufleet/ (our bot bus)   │
+   │          dispatcher, skills, collectors, outbox, ArchHUD adapter   │
+   │                                                                    │
+   │ companion (Python)                                                 │
+   │   out: log tailer (L) or HUD-frame reader (O)                      │
+   │   in:  inbox file writer (F) or chat injector (C)                  │
+   │   installer and doctor, launcher, login, watchdog                  │
+   └─────────────────────────────────┬──────────────────────────────────┘
+                                     │ device user, HTTPS and realtime
+                              Supabase hub ◄──── dashboard (Next.js)
+                                     ▲
+                              planner (Python, Claude API)
 ```
 
-Both tracks share the protocol, the Lua bus core, the hub, the dashboard and the planner. Only the adapters at the two ends differ.
+Files on each bot host, all under the client's `Game/data/lua/autoconf/custom/`. The exact myDU path is confirmed in S8.
 
-## Phase 0: spikes and gates
+| Path | Owner |
+|---|---|
+| `ArchHUD.conf`, `archhud/` | samedicorp ArchHUD 2.105, pinned to commit `6c95222`, unmodified |
+| `archhud/userclass.lua` | Ours: a short shim that loads the bus |
+| `dufleet/` | Ours: the bot bus |
+| `dufleet/inbox.lua` | Written by the companion, only with Transport F |
 
-You run the in-game part. Claude prepares the probe builds and host scripts under `spikes/` and writes up the results in `docs/spikes.md` and the ADRs.
+## Phase 0: spikes
 
-| ID | Track | Question | Decides |
-|---|---|---|---|
-| S0 | C | Does `system.print` reach the disk log? Measure latency, maximum line length, escaping, file naming and rotation, in `%LOCALAPPDATA%\NQ\DualUniverse\log\` and wherever the myDU client writes. Confirm `io` and `os` are absent. Prior: likely no, since NQ removed log output to stop bots | D2 |
-| S1 | C | Is the 48×24 optical grid legible at the pinned resolution and HUD scale? Redraw rate, decode error rate, instruction cost | D2 |
-| S1b | C | Does a sidecar PB's `setScreen` layer show while the avatar sits in Saga's seat, which redraws its own HUD every frame? | D1, D2 |
-| S2 | both | Activate the bus PB (F), then sit in Saga's seat. Does the PB keep running, keep printing, and still receive `onInputText`? Do Saga's own commands still work? Does chat reach every running unit? | D1 |
-| S3 | C | Chat open key, tab persistence, input length limit, behaviour when a menu is open | injector |
-| S4 | C | Unicode `SendInput` vs scan codes. Does an elevated client block input (UIPI)? What happens when the session is locked or disconnected? Does the idle check ignore the companion's own input? | injector |
-| S5 | both | `getRange()` per emitter and receiver size. Confirm the 512-character and one-per-frame limits. Receiver linked directly to the PB vs through relays | Phase 3 |
-| S6 | both | PB proximity radius, detection-zone restart. Confirm that plug-started boards cannot print | Phase 3 |
-| S7 | both | Confirm `MiningUnit` is read-only from Lua, and what calibration needs from the player | `mine_loop` |
-| S8 | both | Login automation; whether EQU8 ships with the myDU client; client install and log paths; per-client CPU, RAM and GPU; FPS cap vs timer resolution | watchdog, sizing |
-| S9 | both | The admin's written policy on automation, screen capture and mods | go-live |
-| S10 | both | Instruction headroom of Saga plus the bus over 2 h (`getInstructionCount`/`getInstructionLimit`) | D1, Phase 2 |
-| M1 | M | `system.modAction`: maximum payload, rate limit, latency. Test from a seat, from an explicitly run PB and from a plug-started PB | D2, Phase 3 |
-| M2 | M | `luaElementEmitEvent`: which slot and event pairs reach the bus PB (receiver `onReceived`, `system` `onInputText`, a custom event) and Saga's seat | D3, Phase 2 |
-| M3 | M | Hub bridge: the mod posts to Supabase over HTTPS, or writes NDJSON that a sidecar process forwards. Where the hub credential lives | architecture |
+You run the in-game part. Claude prepares the probes under `spikes/` (a probe `userclass.lua` and host scripts) and writes the results into `docs/spikes.md` and ADR-0001. Run them in this order:
+
+| ID | Question | Decides |
+|---|---|---|
+| S9 | Does the server admin permit client-side automation, including screen capture and keystroke or file-based commands? Get it in writing | go-live |
+| S8 | Where does the myDU client keep `Game/data/lua` and its logs? Is EQU8 present? Can login be automated? CPU, RAM and GPU per client; FPS cap vs timer resolution | install, watchdog, sizing |
+| A1 | Does ArchHUD 2.105 install from local files and fly on the target server? Check a pilot seat and a remote controller, a custom atlas if the server needs one, and an autopilot trip to a pasted `::pos` on the same planet and on another planet | D1 |
+| A2 | Does the probe `userclass.lua` work? `ExtraOnStart` fires; the wrapped `PROGRAM.controlInput` sees `/b` lines before ArchHUD; a `dub` timer ticks through the wrapped `PROGRAM.onTick`; `userScreen` content shows | D1 |
+| S11 | Are `package`, `package.loaded`, `load`, `loadfile` or `dofile` reachable? Does a re-`require` pick up a file the companion changed at runtime? How fast, and at what instruction cost? | D3 |
+| S0 | Does `system.print` reach the disk log? Latency, maximum line length, escaping, file naming and rotation. Confirm `io` and `os` are absent. Prior: probably not | D2 |
+| S1 | Is the 48×24 optical grid, drawn through `userScreen`, legible at the pinned resolution and HUD scale, and clear of ArchHUD's own elements? Decode error rate, instruction cost | D2 |
+| S3 | Chat open key, tab persistence, input length limit, behaviour with menus open. Needed for login and UI work even if S11 passes | injector |
+| S4 | Unicode `SendInput` vs scan codes; an elevated client (UIPI); a locked or disconnected session; the idle check vs the companion's own input | injector |
+| S10 | Instruction headroom of ArchHUD plus the bus over 2 h, parked and in flight (`getInstructionCount`/`getInstructionLimit`) | Phase 2 |
+| S5 | Emitter ranges per size (`getRange`), the 512-character and one-per-frame limits, direct receiver links vs relays | Phase 3 |
+| S6 | Worker boards: proximity radius, detection-zone restart, and confirmation that plug-started boards cannot print | Phase 3 |
+| S7 | Confirm `MiningUnit` is read-only from Lua, and what calibration needs from the player | `mine_loop` |
 
 Exit criteria:
-- ADR-0001, ADR-0002 and ADR-0003 are merged.
-- A fixture is committed for the chosen transport: log sample, optical calibration PNGs, or `modAction` payloads.
-- `docs/spikes.md` records the measured limits and keybinds.
+- ADR-0001 is merged.
+- Fixtures for the chosen transports are committed: a log sample or calibration PNGs, plus an inbox round trip or a chat transcript.
+- `docs/spikes.md` records the measured limits, paths and keybinds.
 
 ## Phase 1: MVP on one client
 
-Items marked *(ADR)* wait for the gate. Everything else can start now.
+Items marked *(ADR-0001)* wait for the transport decision. Everything else can start now.
 
 ### 1. Repository and CI
 
-- The repository root is the monorepo root. Layout as in handoff §1, plus:
-  - `mod/` (track M only);
-  - `spikes/`;
-  - `docs/verification/` (already present).
+- The repository root is the monorepo root. Layout as in handoff §1, with these changes:
+  - `lua/` holds plain Lua 5.3: the `dufleet/` modules and the `userclass.lua` shim. No DU-LuaC project is needed while everything loads from local files.
+  - `spikes/` and `docs/adr/` are added.
+  - There is no `mod/` directory.
 - GitHub Actions jobs:
-  - Lua 5.3 with busted and du-mocks.
-  - A DU-LuaC 1.3.5 build that reports every build's size and fails above 90% of the 200,000-byte JSON limit.
+  - Lua 5.3 with busted, du-mocks and a fake-ArchHUD harness (stubs for `AP`, `ATLAS`, `PROGRAM` and the flags the adapter reads), plus luacheck.
   - Python with uv, ruff and pytest.
-  - SQL against a PostgreSQL service, reusing the scenario tests from `docs/verification/sql/`.
+  - SQL against a PostgreSQL service, reusing the scenarios in `docs/verification/sql/`.
   - Web: Next.js build, lint and a Playwright smoke test.
 
 ### 2. Protocol (`packages/protocol`)
 
-- JSON schemas for the outbound envelope and the chat grammar.
+- JSON schemas for the outbound envelope and the command grammar.
 - `vectors.json`, including:
   - the CRC check value `29B1`;
   - a body that contains `|`;
   - a multi-chunk base64 message;
-  - chat lines with CRCs.
+  - command lines with CRCs.
 - Codegen to Lua, Python and TypeScript constants.
 - Close the handoff's gaps:
   - Split outbound lines at most 7 times.
-  - The chat CRC covers the UTF-8 bytes between `/b ` and ` #`.
+  - The command CRC covers the UTF-8 bytes between `/b ` and ` #`.
   - One command in flight per bot.
-  - Dedupe by watermark (`dub.cseq_last`) plus the persisted last ACK, both scoped by a hub-issued `epoch` (`dub.epoch`), so that resetting the hub doesn't turn every new command into a "duplicate".
+  - Dedupe by watermark (`dub.cseq_last`) plus the persisted last ACK, both scoped by a hub-issued epoch (`dub.epoch`).
+- Positions in commands are written `pos=<systemId>,<bodyId>,<lat>,<lon>,<alt>`, never with the literal `::pos`. ArchHUD treats any chat line containing `::pos` as a new waypoint.
+- *(ADR-0001, Transport F)* Inbox format: a Lua file that returns a data table (the epoch plus pending commands with their CRCs), written atomically as a temp file that is then renamed.
 
 ### 3. Hub (`supabase/`)
 
@@ -127,24 +136,29 @@ Items marked *(ADR)* wait for the gate. Everything else can start now.
   - Retention through pg_cron.
 - Run the verification scenarios in CI, as pgTAP or as the existing psql scenarios.
 
-### 4. Lua bus (`lua/`, DU-LuaC format 5)
+### 4. Lua bus (`lua/`)
 
-- Build `bus` for the sidecar PB. Slots: `core`, `db` (databank), and optionally `screen` and `emit`.
+- The `userclass.lua` shim:
+  - loads the bus with `pcall(require, "autoconf/custom/dufleet/bus")`;
+  - in `userBase.ExtraOnStart`, wraps `PROGRAM.controlInput` (handles `/b` lines and passes everything else to ArchHUD) and `PROGRAM.onTick` (handles the `dub` tag and passes the rest to ArchHUD), then calls `unit.setTimer("dub", 0.25)`;
+  - in `userBase.ExtraOnStop`, persists state;
+  - runs every entry point inside `pcall`, so a bus bug cannot break flight.
 - Modules:
   - frame and outbox;
   - parser, which never throws and is fuzzed;
-  - dispatcher, a single queue fed by `onInputText`, receiver `onReceived`, and track-M emitted events;
+  - dispatcher, a single queue fed by `/b` chat lines, the inbox *(F)* and receivers (Phase 3);
   - dedupe;
   - builtins: `ping`, `status`, `setid`, `cal`, `resend`, `epoch`;
-  - collectors: position and speed from `construct`, cargo from `getItemsVolume`, run round-robin;
-  - persistence under `dub.` keys on the bus's own databank.
-- Transport adapters behind `---@if transport` *(ADR)*: `modaction`, `print`, `optical`.
-- busted specs with a fake clock, a stub `system.modAction`, and an instruction-budget regression test.
+  - collectors: position and velocity from `construct`, autopilot state from ArchHUD's globals, run round-robin;
+  - persistence: `dub.`-prefixed keys in ArchHUD's `dbHud_1`, which ArchHUD writes key by key and never clears;
+  - `archhud_adapter`: the only module that touches ArchHUD internals.
+- Transports *(ADR-0001)*: `print` (L) or `optical` through `userScreen` (O); `inbox` (F) or chat only (C).
 
 ### 5. Companion (`companion/`, Python 3.12)
 
 Core, which needs no ADR:
 - Config: pydantic, `bots/*.toml`, passwords in keyring.
+- `install` and `doctor`: put ArchHUD (the pinned commit) and the bus files in place and verify them by hash; report the client's Lua folder, log folder and window.
 - Protocol constants from codegen, and the deframer.
 - Hub client (supabase-py async):
   - device-user sign-in;
@@ -152,20 +166,11 @@ Core, which needs no ADR:
   - a poll on every (re)subscribe.
 - Command pump: claim, deliver, wait for the ACK, retry at 1, 3 and 8 s, and recover in-flight commands on start.
 - Telemetry sink: `bot_state` at 1 Hz, `telemetry` every 5 s.
-- CLI: `run`, `replay`, `doctor`.
+- CLI: `run`, `install`, `doctor`, `replay`.
 
-Track C *(ADR)*:
-- `proc/window`.
-- Injection: `inject/focus`, SendInput and chat.
-- `ingest/log_tailer`: DU-LogFramework-style `<record>` splitter with `stat()` polling.
-- And/or the optical reader, with a `calibrate` command.
-
-Track M *(ADR)*:
-- `mod/ModDuFleet`, a C# net6.0 DLL mod:
-  - `TriggerAction` receives bus frames;
-  - commands are pushed through IPub, `modinjectjs` and `luaElementEmitEvent`;
-  - the hub bridge follows M3.
-- The companion shrinks to launcher, login and watchdog.
+Transport adapters *(ADR-0001)*:
+- Out: `ingest/log_tailer` (a `<record>` splitter with `stat()` polling) or `ingest/optical` with a `calibrate` command.
+- In: the inbox writer (F), or `proc/window`, `inject/focus`, SendInput and chat (C). The injector is built either way, for login and UI tasks. Only C puts it on the command path.
 
 ### 6. Dashboard (`dashboard/`)
 
@@ -184,50 +189,52 @@ Track M *(ADR)*:
 - Killing and restarting the companion mid-command still completes that command exactly once: no duplicate, nothing lost.
 - Corrupt frames are rejected, and parser fuzzing never throws.
 - The schema scenario suite is green in CI.
+- With the bus loaded, ArchHUD still flies and handles its own chat commands normally (the A2 checklist).
 
 ## Phase 2: skills
 
-### `goto`
+### `goto`, through ArchHUD's autopilot
 
-Mode-aware:
-- Check links and flight mode first. Maneuver mode needs a VTOL-capable construct.
-- Sidecar topology: Saga's own `/goto ::pos{}` reaches Saga's unit through the command path.
-  - Track C: the companion types it.
-  - Track M: an emitted `onInputText` on Saga's unit if M2 allows it; otherwise the companion types it.
-- Fork topology: an in-process adapter calls `convertToWorldCoordinates`, `AutoPilot:setTarget`, `gotoTarget` and `onAlt1`.
-- Arrival: within tolerance and under 1 km/h for 5 s.
-- Cancel: brake, matching Saga's CTRL behaviour.
-- Anything running past twice its ETA is aborted and re-planned.
+- Pre-checks:
+  - ArchHUD has finished setting up (`SetupComplete`);
+  - no autopilot mode is active;
+  - fuel is above a threshold;
+  - the target body is in ArchHUD's atlas (its custom atlas, on servers that change planets).
+- Start: `ATLAS.AddNewLocation("dub-" .. job, worldPos, true)` selects the target, then a single `AP.ToggleAutopilot()` engages it. Never call it twice within 1.5 s: ArchHUD reads that as an orbital-hop request.
+- Covers same-planet travel (vector to target with altitude hold, then landing), planet-to-planet flight (launch, orbit, reentry) and space targets.
+- Arrival: within tolerance, under 1 km/h for 5 s, with all autopilot flags clear.
+- Cancel: stop the autopilot and brake. The exact calls (`AP.ResetAutopilots`, `AP.BrakeToggle`) are fixed after A1.
+- Anything running past twice its ETA is cancelled and re-planned.
 
 ### Other skills
 
+- **`haul_route`:** `goto` legs, or ArchHUD routes (`AP.routeWP`), plus container volume checks. Itemised contents at most once per 30 s.
 - **`industry`:** start, stop and maintain through the Industry API. `updateBank` at most once per 30 s. Large factories need several boards because of link slots.
-- **`haul_route`:** `goto` legs plus container volume checks. Itemised contents at most once per 30 s.
 - **`patrol`:** waypoints, dwell time, radar contacts.
-- **`mine_loop`:** re-scoped. It monitors mining units (state, pools, calibration rate) and schedules hauls. Calibration is a UI task (Phase 4 vision), or a server-side action on track M.
+- **`mine_loop`:** monitors mining units and schedules hauls. Calibration is a UI task (Phase 4 vision).
 
 ### Registry and map
 
 - Rows in the `skills` table.
-- `/map`, with bodies seeded from DU-OpenData or Saga's atlas and checked per server.
+- `/map`, with bodies from the server's atlas (ArchHUD's `customAtlas` file where the server uses one).
 
 ### Acceptance
 
-- Maneuver mode on a VTOL construct: 10 of 10 same-planet trips land within 5 m.
-- Standard mode: 10 of 10 arrivals within the radius set in the Phase 2 ADR.
+- 10 of 10 same-planet `goto` trips land within the radius set after A1. ArchHUD doesn't document its landing precision.
+- 3 of 3 planet-to-planet trips arrive and park without intervention.
 - 3 unattended haul loops.
-- Cancel engages the brake within 2 s.
-- A 2 h soak with no CPU overload on either unit.
+- Cancel stops the autopilot and engages the brake within 2 s.
+- A 2 h soak with no CPU overload.
 
 ## Phase 3: fleet and relay
 
 - **Watchdog:** relaunch and re-login (S8), and resume the job from `dub.job`.
-- **Deployment:** one companion per host, plus a version-drift alert.
+- **Deployment:** one companion per host, plus a version-drift alert. The `H` frame carries the bus version and the ArchHUD commit.
 - **Relay, only if still needed:**
-  - Worker PBs are plug-started, so they cannot print or draw. They reply over their own emitter.
+  - Worker boards are plug-started, so they cannot print or draw. They reply over their own emitter.
+  - Worker boards load `dufleet/worker` from the same local files.
   - Messages are 512 characters or less, including framing, at most one per frame per channel.
-  - The receiver links directly to the PB.
-  - On track M, if M1 shows that plug-started boards can call `system.modAction`, workers report directly and the relay carries commands only.
+  - The receiver links directly to the board.
 
 Acceptance, unchanged from the handoff:
 - 3 bots run for 8 h with at most 1 manual intervention.
@@ -242,8 +249,8 @@ Acceptance, unchanged from the handoff:
   - Loop, memory and recovery as in handoff §7.
 - **Vision:** Anthropic's computer-use toolset (`computer_toolset_20260801`).
   - The companion executes each action through `inject/focus`, with a region whitelist, a step cap, and an abort on any unexpected dialog.
+  - It handles login, menus, market work and mining calibration.
   - Trades above a set value need confirmation on the dashboard.
-- **Track M:** market and industry reads and orders run server-side through the gameplay API, following the TraderBot sample. Vision is left for login and menus.
 
 Acceptance, unchanged from the handoff:
 - A haul goal is completed with no human input.
@@ -252,47 +259,40 @@ Acceptance, unchanged from the handoff:
 
 ## Cross-cutting rules
 
-- **Licensing:**
-  - The sidecar keeps our Lua separate from Saga, which stays GPL-3.0 on its own unit.
-  - A trimmed fork makes the combined build GPL-3.0.
-  - du-tools is GPL-3.0: read it, but don't copy it into non-GPL code.
+- **Licensing:** ArchHUD is GPL-3.0 and the bus runs in its Lua VM. If the bus is ever distributed, license it GPL-3.0.
 - **Security:**
   - Device users write only through RPCs.
-  - The mod has unrestricted server access, so it gets a narrowly scoped hub identity and a review before it's deployed.
-  - Hub secrets never go into Lua.
-- **Windows hosts (track C):**
+  - The inbox file holds data only: a returned table, validated and CRC-checked. Only the bot's Windows account can write to its folder.
+- **Windows hosts:**
   - The client and the companion run at the same integrity level, because UIPI blocks input into an elevated process.
   - The console session stays logged in and unlocked: use auto-logon, and never leave an RDP session disconnected.
   - The idle check ignores the companion's own injected input.
-- **Size gate:** CI reports every Lua build's size and fails above 90% of the JSON paste limit.
+- **Local files:** the only game-folder files we write are `autoconf/custom/archhud/userclass.lua` and `autoconf/custom/dufleet/`, plus ArchHUD's own files at install time.
 
 ## Risks
 
 | Risk | Mitigation |
 |---|---|
-| No log channel on track C (likely) | Transport O is built in; track M avoids the question |
-| Policy: NQ removed log output specifically to stop bots | Written consent per server (S9). Track M needs the admin anyway |
-| The sidecar can't run beside Saga's seat (S2 fails) | Trimmed Saga fork with an in-process adapter, at a maintenance cost |
-| `luaElementEmitEvent` can't raise the needed events (M2) | Commands fall back to chat keystrokes; telemetry can stay on `modAction` |
-| The mod API changes between myDU server versions | Record the server version in ADR-0003; keep M1 and M2 as regression checks |
-| Focus contention (track C) | One client per VM, one input mutex, verification after every send |
-| CPU overload | Timers, round-robin collectors, the S10 soak; the sidecar splits load across units |
-| Client updates | Fixtures plus `dufleet doctor` at startup |
+| No log channel (likely) | Transport O, drawn through `userScreen` |
+| No file inbox (S11 fails) | Chat keystrokes (Transport C), with focus checks after every send |
+| Policy: NQ removed log output specifically to stop bots, and you are a player, not the admin | Written permission from the admin (S9) before any bot runs unattended |
+| ArchHUD is dormant upstream, and the fork has one maintainer | Pin the commit; keep every ArchHUD call in `archhud_adapter`; run contract tests against the fake-ArchHUD harness; carry our own patches if needed (GPL-3.0 allows it) |
+| ArchHUD plus the bus exceed the CPU quota | Timer-driven bus, round-robin collectors, the S10 soak; lower ArchHUD's HUD tick if needed |
+| Focus contention during UI tasks | One client per VM, one input mutex, verification after every send |
+| Client updates | Fixtures, plus `dufleet doctor` at startup |
 
 ## Open questions for you
 
-1. **D0:** do you run the target myDU server(s), or can their admins install a DLL mod? This is the biggest fork in the plan.
-2. Which constructs will the bots fly? VTOL-capable ones (Saga's Maneuver mode) or standard autopilot ships? Same planet only at first?
-3. Supabase: a new hosted project, an existing one, or self-hosted?
-4. Fleet size and hosts: spare PCs, Hyper-V GPU-P VMs, or cloud instances?
-5. The `Ai helper/` folder: keep it, remove it, or give it a purpose?
+1. Which myDU server will the bots run on, and does it use a custom atlas (changed planets)? This sets ArchHUD's `customAtlas` and the dashboard map.
+2. Supabase: a new hosted project, an existing one, or self-hosted?
+3. Fleet size and hosts: spare PCs, Hyper-V GPU-P VMs, or cloud instances?
+4. The `Ai helper/` folder: keep it, remove it, or give it a purpose?
 
 ## Next steps
 
-1. **You:** answer questions 1 and 2.
+1. **You:** ask the server admin for written permission (S9), and answer question 1.
 2. **Claude:** build the Phase 0 kit in `spikes/`:
-   - DU-LuaC probe builds for S0, S1, S1b, S2, S5 and S10;
-   - host scripts for log grep, dxcam capture and a SendInput test;
-   - if track M is possible, a minimal logging mod for M1 and M2.
-3. **You:** run the probes in game and paste the results. The handoff estimates S0 at 15 minutes; the full set is a few hours.
-4. **Claude:** write ADR-0001 to ADR-0003. In parallel, start Phase 1 workstreams 1–3 and the transport-independent parts of 4–6.
+   - a probe `userclass.lua` covering A2, S11, S0 and S1, all in one in-game session;
+   - host scripts for the log grep, the inbox write, dxcam capture and a SendInput test.
+3. **You:** install ArchHUD 2.105 on one ship, run A1 and the probes, and paste the results.
+4. **Claude:** write ADR-0001. In parallel, start Phase 1 workstreams 1–3 and the transport-independent parts of 4–6.
