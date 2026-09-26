@@ -1,0 +1,18 @@
+{
+  "cli": { "fmtVersion": 5 },
+  "name": "mydu-fleet",
+  "sourcePath": "src",
+  "outputPath": "out",
+  "builds": [
+    { "name": "pilot", "type": "control", "slots": [
+      {"name":"core","type":"core"}, {"name":"db","type":"databank"}, {"name":"tele","type":"telemeter"},
+      {"name":"emit","type":"emitter"}, {"name":"screen","type":"screen"} ] },
+    { "name": "worker", "type": "control", "slots": [
+      {"name":"core","type":"core"}, {"name":"db","type":"databank"},
+      {"name":"rx","type":"receiver"}, {"name":"tx","type":"emitter"} ] }
+  ],
+  "targets": [
+    { "name": "development", "minify": false, "handleErrors": true,  "variables": { "debug": true,  "transport": "log" } },
+    { "name": "production",  "minify": true,  "handleErrors": false, "variables": { "debug": false, "transport": "optical" } }
+  ]
+}

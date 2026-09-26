@@ -1,0 +1,6 @@
+# Build output of the DU-LuaC verification projects (docs/verification/luac/run.sh)
+docs/verification/luac/*/out/
+# Code-completion files DU-LuaC adds to those projects on build
+docs/verification/luac/*/util/
+docs/verification/luac/*/emmy.config.json
+docs/verification/luac/*/.gitignore

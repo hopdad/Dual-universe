@@ -1,0 +1,234 @@
+# Handoff verification
+
+Checked on 2026-09-26 against [the handoff](handoff/original-handoff.md). Where the two disagree, this report wins. [plan.md](plan.md) is built on it.
+
+## How it was checked
+
+| Area | Method |
+|---|---|
+| Lua API | Grep of the EmmyLua Codex that DU-LuaC generates from Novaquark's official API mockup (the last official 1.x API) |
+| Referenced projects | Read from shallow clones (table below) |
+| SQL (handoff §5) | Migrations 0001–0003 applied to PostgreSQL 16.13 with a small Supabase stand-in, then scenario tests as owner, other tenant, device user and `anon`: [verification/sql/](verification/sql/) |
+| DU-LuaC (handoff §3) | Builds with DU-LuaC 1.3.5, the current npm release, of the handoff's `project.json`, a corrected one, and Saga: [verification/luac/](verification/luac/) |
+| Protocol (handoff §2) | CRC-16/CCITT-FALSE check value and optical-frame arithmetic, in Python |
+| Stack | npm and PyPI registries, current vendor docs |
+
+| Repository | Commit | Date |
+|---|---|---|
+| tobitege/du-saga | a3c2356 | 2025-09-01 |
+| tobitege/du-tools | fcd540e | 2026-08-09 |
+| dual-universe/mydu-server-mods | 2976642 | 2026-04-27 |
+| wolfe-labs/DU-LuaC | abe06c4 (npm 1.3.5) | 2024-05-02 |
+| 1337joe/du-mocks | a510c77 | 2024-09-27 |
+| PerMalmberg/du-yfs | 6561e1b | 2024-01-13 |
+| wolfe-labs/DU-LogFramework | 89b09d1 | 2021-12-21 |
+| Dimencia/DU-Audio-Sharp | a878c0c | 2022-02-08 |
+| tiramon/du-map-companion | d9d6970 | 2022-10-15 |
+
+The verification environment could not reach `support.dualthegame.com` or `installer-prod.dualthegame.com` (blocked by its egress proxy). Claims that rest only on those sites stay open.
+
+## Verdict
+
+The architecture holds: commands in, a transport-agnostic protocol out, a Supabase hub, a dashboard, and a planner that only composes vetted skills. Eight findings change how it gets built.
+
+### 1. myDU already has a Lua-to-server channel (new; changes the transport decision)
+
+- Lua can call `system.modAction(modName, actionId, constructId, elementId, playerId, payload)`. A server DLL mod receives it in `TriggerAction`.
+  - Novaquark's own sample calls it from a control seat (`mydu-server-mods/ModRotateEngine/Readme.md:39`).
+  - du-tools' ModFlightLogger streams flight telemetry this way (`du-tools/ModFlightLogger/README.md:97`).
+- The reverse direction exists too. A mod can push JavaScript to one player's client through the `modinjectjs` event, which `eval()`s its payload (toolkit doc, line 47). That JavaScript can call `CPPMod.luaElementEmitEvent(constructId, elementId, slotName, eventName, [args])`, which "Emit[s] an event as if the unit had received it" (`APIReference/JavascriptAPI.md:94`).
+- The toolkit can log in headless "Bot" users (`CreateUser`) and ships a `TraderBot` that places market orders server-side.
+- du-tools, by Saga's maintainer and active in August 2026, already runs an MCP bridge on this mechanism (DuMcpBridge plus ModUiToolbox).
+- `system.modAction` is a myDU addition. It is not in the 1.x Codex or in du-mocks.
+
+Consequence: on any server where the admin installs a small mod, telemetry out and commands in need no log tail, no OCR and no keystroke injection. The handoff calls this path out of scope. The plan makes it decision gate D0.
+
+### 2. The bot bus does not fit inside Saga (wrong)
+
+- DU-LuaC checks every build against 200,000 bytes for a JSON paste and 180,000 bytes for CONF (`src/commands/BuildProjectCommand.ts:169,184`).
+- Saga's release build is 198,055 bytes as JSON (99.0%, 1,945 bytes left) and 197,430 bytes as CONF, which is already over that limit. Rebuilding it here produced a byte-identical file.
+- DU-LuaC's `compress` build option makes it bigger (198,805 bytes).
+- Saga's README already says features were removed "to make room for new code".
+
+Consequence: "fork Saga and put the bus inside it" only works if Saga features are deleted. The plan prefers a sidecar programming board next to an unmodified Saga, gated on spike S2, with a trimmed fork as the fallback.
+
+### 3. Saga owns the control unit's HUD (wrong for Transport O)
+
+`HUD.update()` builds the whole HUD into one string and calls `system.setScreen(rendered)` (`lua/hud/hud.lua:151`). It runs from `onUpdate` on every frame (`lua/events/system_update.lua:46`). An optical frame drawn with `setScreen` from the same unit would be overwritten on the next frame. The frame has to be composited into Saga's string (fork) or drawn by another unit (spike S1b).
+
+### 4. Units started by a plug signal cannot print or draw (missed)
+
+The Codex marks `system.print`, `setScreen`, `showScreen` and the widget calls as "disabled if the player is not running the script explicitly (pressing F on the Control Unit, vs. via a plug signal)". `getWaypointFromPlayerPos` and `setWaypoint` are "only in explicit runs". Worker PBs restarted by a detection zone or a receiver can only report over an emitter. Whether `system.modAction` has the same restriction is spike M1.
+
+### 5. The `project.json` in §3 does not build (wrong)
+
+DU-LuaC 1.3.5 stops at the first slot: `Can't initialize a Slot without a name! Data: {"type":"CoreUnit"}`.
+
+- Each slot needs a `name` and a `type`. The `type` is a DU-LuaC key (`core`, `databank`, `telemeter`, `emitter`, `receiver`, `screen`), not an element class.
+- The entry file is named after the build (`src/pilot.lua`, `src/worker.lua`), not `src/main.lua`.
+- `fmtVersion` 5 is the current format. DU-LuaC 1.3.5 writes it for new projects and Saga uses it; v2 still loads.
+- Targets should set `handleErrors` (on in development, off in production).
+- The in-game databank class, for `getLinksByClass`, is `DataBankUnit`, not `DatabankUnit`.
+
+The [corrected file](verification/luac/corrected/project.json) builds, and `---@if transport "optical"` compiles exactly one branch into each target.
+
+### 6. The schema has seven defects, three of them security holes (wrong)
+
+All four files apply cleanly. The scenario tests then showed:
+
+| # | Defect | Effect |
+|---|---|---|
+| 1 | `command_seq` has no RLS | Any tenant, and `anon` without logging in, can read and reset any bot's sequence. The owner's next command then fails with a duplicate key |
+| 2 | `bots_device_update` has no column limits | The device user can set `owner_id` to itself and lock the owner out. This contradicts "a compromised VM can only touch its own bot" |
+| 3 | `events` rows with `bot_id is null` | Every tenant can read and delete them |
+| 4 | Clients may supply `cseq` | The trigger only fires `when (new.cseq is null)`, so a client can jump the sequence (tested with 999) |
+| 5 | `claim_next_command` returns a composite | An empty queue returns one all-NULL row instead of no rows |
+| 6 | No single-flight in the database | A second claim hands out cseq 2 while cseq 1 is still un-acked |
+| 7 | No recovery for `claimed` or `sent` rows | After a companion crash those rows are never re-driven, so a command can be lost |
+| – | Minor | The goals foreign key blocks bot deletion; `updated_at` is never set; `skills_read` uses the legacy `auth.role()` form |
+
+[0005_fixes.sql](verification/sql/0005_fixes.sql) closes 1–6, the goals foreign key and the `skills_read` policy (`updated_at` only for `commands`), and the same scenarios then show the safe outcome ([results below](#schema-test-results)). Defect 7 needs a lease and recovery RPC, which is in Phase 1 of the plan.
+
+### 7. Saga's `/goto` behaves differently per flight mode (partly wrong)
+
+- In Standard mode, `/goto ::pos{}` sets the autopilot target and switches the autopilot on (`lua/events/system_input.lua:176-205`, then `onAlt1` in `lua/events/keyboard.lua:47`).
+- Only in Maneuver mode does it climb, align, traverse and land automatically. Saga restricts Maneuver mode to VTOL-capable constructs and warns against using it for interplanetary trips.
+- Aborting is a tap on the brake key (CTRL), which brings a VTOL ship to a stop. The handoff's "cancel cuts thrust" has no direct equivalent.
+
+The Phase 2 target "lands within 5 m, 10 of 10" matches Maneuver mode's documented precision landing. Standard-mode autopilot precision is not documented, so the plan gives it a separate acceptance radius.
+
+### 8. The dashboard stack moved (wrong)
+
+- Next.js is at 16.3. Since 16, `middleware.ts` is deprecated in favour of `proxy.ts`, which runs on Node.
+- Current Supabase SSR guidance: use the publishable key, `getAll`/`setAll` cookie handlers, and `getClaims()` to protect pages.
+
+## Claim by claim
+
+Status: CONFIRMED, PARTLY (true with a caveat), WRONG, GAP (the spec leaves it undefined), OPEN (not verifiable here, moved to a spike).
+
+### The handoff's Key Findings table
+
+| Topic | Status | Evidence or correction |
+|---|---|---|
+| Lua log writing removed (Panacea) | CONFIRMED | MassivelyOP summary (2022-01-18). The Codex has no `System.log*`. The only similar call is `RenderScript.logMessage`, which writes to the Lua channel when the screen's "enable output in Lua channel" box is ticked |
+| Log-based tools deprecated | CONFIRMED | DU-Audio-Sharp README:3; du-map-companion README:66. The ZarTaen quote was not checked |
+| NQ stripped log data | CONFIRMED | du-map-companion README:66 |
+| Log location | PARTLY | `%LOCALAPPDATA%\NQ\DualUniverse\` per NQ support (search result). DU-LogFramework adds: subfolder `log\`, newest file sorts last, entries are `<record>` elements with `<logger>` and `<message>` children (`index.js:38-55,109-114`). The myDU client installs to `C:\ProgramData\My Dual Universe` (ClientModManager README:13); its log folder is unconfirmed (S0, S8) |
+| Log encoding | OPEN | Release note not re-read. Keeping `errors="replace"` costs nothing |
+| Forum reaction (QR codes plus OCR) | OPEN | Forum not fetched. "Wolfram" is Matt of Wolfe Labs, the DU-LuaC author (Saga README:369) |
+| Saga chat commands | PARTLY | All listed commands exist; `/goto` depends on flight mode (finding 7) |
+| Saga maintenance | CONFIRMED | 4.1.6.2 of 2025-09-01, GPL-3.0, DU-LuaC, GFN note. Default-branch HEAD is 2025-09-01; "updated Apr 2026" was not seen |
+| Saga constraints | CONFIRMED | All quotes match (README:39, 41, 144, 343-344). It is also at 99% of the paste limit (finding 2) and owns the HUD (finding 3) |
+| YFS | CONFIRMED | README:4; link order README:75-77. Reference only |
+| DU-LuaC features | CONFIRMED | `onEvent`, `getLinksByClass`, `embedFile` and `---@if` all build |
+| DU-LuaC project format | WRONG | Format 5 is current and the example does not build (finding 5) |
+| Emitter/receiver relay quirk | OPEN | Forum not fetched. The Codex adds hard limits ([below](#api-limits-the-handoff-did-not-have)) |
+| du-mocks | CONFIRMED | README:6, 30, 53; last commit 2024-09-27. Needs Lua 5.3 or later (rockspec). Has no `system.modAction` |
+| Windows 10/11 and AVX | OPEN | NQ support blocked here; nothing contradicts it |
+| EQU8 exception for `Game/data/lua` | OPEN | NQ support blocked here. The myDU client's install path differs from the official client's |
+| myDU server mods | CONFIRMED, understated | Quote at toolkit doc line 67. This is a first-class transport, not only "the clean path if an admin cooperates" (finding 1) |
+| du-tools | CONFIRMED, understated | README now read: an MCP bridge, a JavaScript-injection toolbox, and a Lua telemetry mod |
+
+### Other claims in the spec
+
+| Claim | Status | Note |
+|---|---|---|
+| `onInputText` exists | CONFIRMED | Codex: "A new message has been entered in the Lua tab of the chat, acting like a command line interface" |
+| A `/b` handler can coexist with Saga | CONFIRMED | Saga registers through DU-LuaC's multi-handler (`lua/saga.lua:192`) and silently ignores commands it does not know |
+| An in-process `SagaAdapter` is possible | CONFIRMED, same unit only | The `/goto` path uses globals: `convertToWorldCoordinates`, `AutoPilot:setTarget`, `resetAP`, `gotoTarget`, `onAlt1` |
+| Industry skill from Lua | CONFIRMED | `startRun`, `startMaintain`, `startFor`, `stop`, `getState`, `getInfo`. The class `IndustryUnit` matches DU-LuaC |
+| `mine_loop` waits for S7 | MOSTLY ANSWERED | `MiningUnit` has only getters (state, ore pools, rates, last extraction) and no calibrate or start call, so calibration has to happen outside Lua (the player's UI, or a server mod) |
+| CPU quota | CONFIRMED (API only) | `system.getInstructionCount()` and `getInstructionLimit()` exist; the numbers still need measuring |
+| `unit.setTimer('bot', 0.25)` | CONFIRMED | Timer resolution is bounded by the framerate, so a low FPS cap also slows ticks and the optical frame rate |
+| `setScreen` for Transport O | PARTLY | Exists, but conflicts with Saga (finding 3) and works in explicit runs only |
+| Optical frame capacity | CONFIRMED | 48×24 cells × 2 bits = 288 bytes; minus a 16-byte header and a 2-byte CRC leaves 270 bytes; 540–1,080 B/s at 2–4 fps. The sample 130-byte telemetry body fits one frame |
+| CRC-16/CCITT-FALSE | CONFIRMED | check("123456789") = `29B1`, empty input = `FFFF` |
+| Outbound line parsing | GAP | JSON bodies can contain `\|`, so a parser must split at most 7 times |
+| Chat CRC | GAP | The covered bytes are not defined. Proposal: the UTF-8 bytes between `/b ` and ` #` |
+| Dedupe (ring of 64 plus saved last cseq) | GAP | After a PB restart only the saved watermark survives. With in-order, single-flight delivery, a watermark plus the persisted last ACK is enough. An epoch is also needed, or a hub reset makes every new command look like a duplicate |
+| Realtime (telemetry not published) | CONFIRMED | Sound. supabase-py's async client supports `on_postgres_changes` with a `filter` |
+| Companion as device user, never service role | PARTLY | The right idea, but RLS as written lets the device user take ownership (finding 6) |
+| Planner tool schema | GAP | `complete_goal` and `fail_goal` list `required` keys with no `properties`; the skill enum is hard-coded and should come from the `skills` table |
+| Vision loop | UPDATE | Anthropic's computer-use toolset (`computer_toolset_20260801`, GA on the Claude API) is built for screenshot-then-click loops. Execute its actions through `inject/focus` instead of inventing an action protocol |
+
+## API limits the handoff did not have
+
+From the Codex. Spikes should confirm these, not rediscover them.
+
+| API | Limit |
+|---|---|
+| `Emitter.send(channel, message)` | One transmission per frame per channel. A channel over 64 characters is not sent. Messages are truncated at 512 characters |
+| `Emitter.getRange()`, `Receiver.getRange()` | The range can be read in game (S5) |
+| `Container.updateContent()` | One call per 30 s. `getItemsVolume()` and `getMaxVolume()` need no refresh |
+| `Industry.updateBank()` | One call per 30 s |
+| `unit.setTimer(tag, period)` | Resolution limited by the framerate |
+| `system.print`, `setScreen`, `showScreen`, widgets | Explicit runs only |
+| `system.playSound(path)` | Plays a file from the user's audio folder; the post-Panacea replacement for log-based audio tools |
+| `Telemeter.getMaxDistance()` | 100 m by default |
+
+## Schema test results
+
+Run by [sql/run.sh](verification/sql/run.sh). "Handoff" is migrations 0001–0003 as written; "Fixed" adds [0005_fixes.sql](verification/sql/0005_fixes.sql).
+
+| Scenario | Handoff | Fixed |
+|---|---|---|
+| Server assigns cseq 1, 2, 3 | 1,2,3 | 1,2 (two inserted) |
+| Second claim while cseq 1 is un-acked | Hands out cseq 2 | 0 rows |
+| Claim on an empty queue | 1 row, all NULL | 0 rows |
+| Other tenant reads or resets `command_seq` | Sees 1 row, resets 1 row | Permission denied |
+| `anon` reads `command_seq` | Sees 1 row | Permission denied |
+| Owner inserts after the reset | Duplicate key error | n/a |
+| Other tenant reads or deletes null-bot events | Sees 1, deletes 1 | Sees 0 |
+| Device user sets `bots.owner_id` to itself | 1 row updated; owner sees 0 bots | 0 rows; status goes through the `bot_report` RPC |
+| Client inserts cseq 999 | Accepted | Ignored (gets 3) |
+| Client rewrites `verb` after insert | Accepted | Rejected as immutable |
+| Delete a bot that a goal references | Foreign key error | Goal kept with `bot_id` null |
+
+`0004_retention.sql` was not executed because pg_cron is not in plain PostgreSQL. Check it with `supabase start`.
+
+## Build results
+
+| Build | Result |
+|---|---|
+| Handoff `project.json` | `[ERROR] Can't initialize a Slot without a name! Data: {"type":"CoreUnit"}` |
+| Corrected `project.json` (pilot and worker, two targets) | Success, 9–10 kB JSON each. Development contains only the `log-print` branch; production contains only `optical-frame` |
+| Saga release, as published | 198,055 B JSON (99.0% of 200,000), 197,430 B CONF (over 180,000). Reproduced byte-for-byte |
+| Saga release with `compress: true` | 198,805 B JSON (larger) |
+| Saga on Linux | Fails as-is: the build is named `Saga` but the entry file is `lua/saga.lua`. It works on Windows' case-insensitive file system; CI on Linux needs a `Saga.lua` copy or alias |
+
+## Stack versions on 2026-09-26
+
+| Package | Version |
+|---|---|
+| next | 16.3.6 |
+| @supabase/ssr | 0.12.7 |
+| @supabase/supabase-js | 2.117.2 |
+| tailwindcss | 4.3.3 |
+| supabase (Python) | 2.31.0 |
+| dxcam | 0.3.0 (released 2026-03, maintained again) |
+| mss | 10.2.0 |
+| pywin32 | 312 |
+| keyring | 25.7.0 |
+| pyinstaller | 6.22.3 |
+| anthropic (Python) | 1.8.0 (needs Python 3.10+) |
+| @wolfe-labs/du-luac | 1.3.5 (2024-03) |
+
+## Still open, moved to spikes
+
+- Does `system.print` reach the disk log? (S0)
+- The myDU client's log folder, whether EQU8 ships with it, and login automation (S8)
+- `onInputText` fan-out across units, and whether a sidecar PB keeps running and receiving chat while the avatar sits in Saga's chair (S2)
+- Chat key and input length limit (S3); Unicode `SendInput` vs scan codes (S4)
+- Emitter behaviour through relays, and real ranges (S5); PB proximity radius (S6)
+- CPU quota numbers with Saga running (S10)
+- `system.modAction` size and rate limits, and whether plug-started units may call it (M1); which events `luaElementEmitEvent` can raise (M2)
+- du-socket internals: not needed while the protocol keeps its own framing
+
+## Reproduce
+
+```bash
+docs/verification/sql/run.sh    # needs a scratch PostgreSQL 16; see the script header
+docs/verification/luac/run.sh   # needs Node 18+ and the npm registry
+```
+
+Saga size check: clone tobitege/du-saga, copy `lua/saga.lua` to `lua/Saga.lua`, run `npx -p @wolfe-labs/du-luac@1.3.5 du-lua build`, then `ls -l out/release`.
