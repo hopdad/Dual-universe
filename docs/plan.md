@@ -188,6 +188,7 @@ Transport adapters *(ADR-0001)*:
   - `/bots/[id]`;
   - `/commands`: `ping` and `status` only.
 - A Playwright smoke test: insert a `bot_state` row and check that the card updates.
+- Done 2026-09-27 ([dashboard/README.md](../dashboard/README.md)): all four pages, magic-link sign-in, realtime fleet table with the drift badge, `proxy.ts` session refresh, protocol constants generated for TypeScript, and lint, typecheck, unit tests, build and signed-out Playwright smoke tests in CI. The realtime smoke test waits for a Supabase project.
 
 ### Acceptance
 

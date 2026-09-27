@@ -89,6 +89,7 @@ Game files:
 - Transport adapters wait for ADR-0001. The protocol package, the hub schema, the dashboard skeleton and the Lua
   and companion cores do not.
 - Tests: cd lua && ./tools/deps.sh && busted && luacheck . ; cd companion && uv run pytest && uv run ruff check .
+  cd dashboard && npm run lint && npm run typecheck && npm test && npm run build && npm run e2e
   After a schema change: python packages/protocol/codegen.py, then (in companion/)
   uv run python ../packages/protocol/tools/make_vectors.py.
 - CI (.github/workflows/ci.yml) runs all of these plus supabase/tests/run.sh on PostgreSQL 16, and the pump tests

@@ -91,3 +91,29 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - run: supabase/tests/run.sh
+
+  web:
+    name: Dashboard (lint, typecheck, unit, build, smoke)
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        working-directory: dashboard
+    env:
+      # Unreachable on purpose: the smoke tests cover the signed-out paths only.
+      NEXT_PUBLIC_SUPABASE_URL: http://127.0.0.1:54321
+      NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: sb_publishable_ci
+      NEXT_TELEMETRY_DISABLED: "1"
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: dashboard/package-lock.json
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run build
+      - run: npx playwright install --with-deps chromium
+      - run: npm run e2e
