@@ -140,12 +140,16 @@ create index events_bot_ts on public.events (bot_id, ts desc);
 create index events_owner_ts on public.events (owner_id, ts desc);
 
 -- Every new command gets the bot's current epoch and next cseq, whatever the client sent.
+-- A `run` command's job_id is its second argument, the job id the bus sees.
 create function public.commands_before_insert() returns trigger
 language plpgsql security definer set search_path = '' as $$
 begin
   insert into public.command_seq (bot_id) values (new.bot_id) on conflict do nothing;
   update public.command_seq set next = next + 1 where bot_id = new.bot_id
     returning epoch, next - 1 into new.epoch, new.cseq;
+  if new.verb = 'run' and jsonb_array_length(new.args) >= 2 then
+    new.job_id := new.args ->> 1;
+  end if;
   new.status := 'queued';
   new.attempts := 0;
   new.error := null;

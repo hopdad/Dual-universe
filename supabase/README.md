@@ -39,6 +39,7 @@ queued ──claim──> claimed ──> sent ──> acked ──> done
 
 - The insert trigger gives each command its bot's current `epoch` and next `cseq`. After that, the bot, epoch, cseq, verb, args and job never change, even for the database owner.
 - `args` is a JSON array of strings, in the order they go on the command line (`docs/protocol.md`).
+- For `run`, the trigger sets `job_id` to the second argument, the job id the bus reports in its R frame.
 - One command per bot is in flight (`claimed` or `sent`). `claim_next_command(bot, lease_s default 30)` returns nothing while one is in flight, unless its lease is older than `lease_s`: then it returns the same command again. Claims for one bot are serialised.
 - `recover_inflight(bot)` returns the in-flight command with a fresh lease, for a companion that restarts. It never claims a new one.
 - Because the command keeps its epoch and cseq, a redelivery after a crash is answered by the bus from its stored reply and never runs twice.

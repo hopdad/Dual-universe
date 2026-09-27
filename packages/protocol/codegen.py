@@ -106,8 +106,10 @@ def render_lua(c: dict) -> str:
 # --- Python ----------------------------------------------------------------------
 
 
-def render_py(c: dict) -> str:
+def render_py(c: dict, schema: dict) -> str:
     lines = [f'"""{HEADER}"""', "", "# ruff: noqa: E501", ""]
+    # Frame body schemas, for validation in the companion. The bus never needs them.
+    c = {**c, "BODY_DEFS": schema["$defs"]}
     for key, value in c.items():
         if key in SETS:
             value = tuple(value)
@@ -122,8 +124,9 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--check", action="store_true", help="fail if generated files are out of date")
     args = parser.parse_args(argv)
-    c = constants(load())
-    outputs = {LUA_OUT: render_lua(c), PY_OUT: render_py(c)}
+    schema = load()
+    c = constants(schema)
+    outputs = {LUA_OUT: render_lua(c), PY_OUT: render_py(c, schema)}
     stale = []
     for path, text in outputs.items():
         current = path.read_text(encoding="utf-8") if path.exists() else None

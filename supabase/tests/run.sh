@@ -13,7 +13,7 @@ here=$(cd "$(dirname "$0")" && pwd)
 db=${DUFLEET_TEST_DB:-dufleet_hub_test}
 export PGOPTIONS="${PGOPTIONS:-} -c client_min_messages=warning"
 
-psql -X -q -d postgres -c "drop database if exists $db" -c "create database $db"
+psql -X -q -d postgres -c "drop database if exists $db" -c "create database $db template template0 encoding 'UTF8'"
 psql -X -q -v ON_ERROR_STOP=1 -d "$db" -f "$here/00_platform_stub.sql"
 for f in "$here"/../migrations/*.sql; do
   psql -X -q -v ON_ERROR_STOP=1 -d "$db" -f "$f"

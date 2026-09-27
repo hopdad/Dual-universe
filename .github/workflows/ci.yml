@@ -32,6 +32,21 @@ jobs:
   python:
     name: Protocol, companion and probe kit (pytest, ruff)
     runs-on: ubuntu-24.04
+    services:
+      postgres: # for the pump tests against the real hub SQL (companion/tests/test_pump_pg.py)
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready --health-interval 5s --health-timeout 5s --health-retries 12
+    env:
+      PGHOST: localhost
+      PGPORT: "5432"
+      PGUSER: postgres
+      PGPASSWORD: postgres
+      DUFLEET_PG_TESTS: "1"
     steps:
       - uses: actions/checkout@v7
       - name: Install uv

@@ -138,7 +138,7 @@ Items marked *(ADR-0001)* wait for the transport decision. Everything else can s
   - The realtime publication.
   - Retention through pg_cron.
 - Run the verification scenarios in CI, as pgTAP or as the existing psql scenarios.
-- Done 2026-09-27 ([supabase/README.md](../supabase/README.md)): migrations `0001`–`0005` with all of the above, plus column-level grants, `command_progress`, `cancel_command` and `sync_epoch` (a hub that lost its numbering moves to a new epoch instead of having every command refused). 16 psql scenarios in `supabase/tests/` run on plain PostgreSQL, and deliberate mutations of the migrations make them fail.
+- Done 2026-09-27 ([supabase/README.md](../supabase/README.md)): migrations `0001`–`0005` with all of the above, plus column-level grants, `command_progress`, `cancel_command` and `sync_epoch` (a hub that lost its numbering moves to a new epoch instead of having every command refused). 17 psql scenarios in `supabase/tests/` run on plain PostgreSQL, and deliberate mutations of the migrations make them fail.
 
 ### 4. Lua bus (`lua/`)
 
@@ -172,6 +172,8 @@ Core, which needs no ADR:
 - Command pump: claim, deliver, wait for the ACK, retry at 1, 3 and 8 s, and recover in-flight commands on start.
 - Telemetry sink: `bot_state` at 1 Hz, `telemetry` every 5 s.
 - CLI: `run`, `install`, `doctor`, `replay`.
+
+- Done 2026-09-27 ([companion/README.md](../companion/README.md)): the command pump and frame router behind a `Hub` interface, tested against an in-memory hub, a reference bus, the real Lua bus output, and the real hub SQL on PostgreSQL (including exactly-once delivery across a companion restart). Still to come: the Supabase client, config, CLI and doctor.
 
 Transport adapters *(ADR-0001)*:
 - Out: `ingest/log_tailer` (a `<record>` splitter with `stat()` polling) or `ingest/optical` with a `calibrate` command.

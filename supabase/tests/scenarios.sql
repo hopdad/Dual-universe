@@ -284,7 +284,17 @@ do $$ begin
   assert (select count(*) from public.commands) = 0, 'the bot''s commands are gone';
 end $$;
 
-\echo 'H16 platform wiring: RLS everywhere, realtime tables, retention jobs'
+\echo 'H16 a run command''s job_id is always its job argument'
+:as_owner_b
+insert into public.commands (bot_id, verb, args) values ('22222222-0000-0000-0000-000000000002', 'run', '["goto", "j_b1", "pos=0,2,1,2,3"]');
+insert into public.commands (bot_id, verb, args, job_id)
+values ('22222222-0000-0000-0000-000000000002', 'run', '["goto", "j_b2"]', 'j_other');
+do $$ begin
+  assert (select string_agg(job_id, ',' order by cseq) from public.commands) = 'j_b1,j_b2', 'job_id follows args[1]';
+end $$;
+select test.expect_error($q$insert into public.commands (bot_id, verb, args) values ('22222222-0000-0000-0000-000000000002', 'run', '["goto", "bad job"]')$q$, '23514');
+
+\echo 'H17 platform wiring: RLS everywhere, realtime tables, retention jobs'
 :as_admin
 do $$ begin
   assert not exists (select 1 from pg_class c join pg_namespace n on n.oid = c.relnamespace
