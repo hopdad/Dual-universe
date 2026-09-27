@@ -86,6 +86,9 @@ Game files:
 - Pinned upstream files and their SHA-256 live in spikes/host/src/dufleet_probe/pins.py.
 - Transport adapters wait for ADR-0001. The protocol package, the hub schema, the dashboard skeleton and the Lua
   and companion cores do not.
+- Tests: cd lua && ./tools/deps.sh && busted && luacheck . ; cd companion && uv run pytest && uv run ruff check .
+  After a schema change: python packages/protocol/codegen.py, then (in companion/)
+  uv run python ../packages/protocol/tools/make_vectors.py.
 
 ## When unsure
 - DU API behaviour not in the Codex or du-mocks: add a spike to docs/spikes.md; do not guess.

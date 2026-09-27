@@ -31,7 +31,7 @@ The formats below are the same on every transport. Transport O carries the same 
 | Field | Rule |
 |---|---|
 | `1` | Protocol version. The companion drops other versions |
-| `bot` | `[A-Za-z0-9_-]{1,16}`, set with `setid` and kept in the databank |
+| `bot` | `[A-Za-z0-9_-]{1,16}`, set with `setid` and kept in the databank. Until then, `c` plus the construct id |
 | `kind` | One of `H T E A N R D` (below) |
 | `seq` | Counter per bus start, from 1, at most 2^32-1, no leading zeros. Frames sent again by `resend` keep their seq |
 | `i/n` | Chunk index and count, 1 ≤ i ≤ n ≤ 99, no leading zeros |
@@ -74,7 +74,7 @@ Positions are world coordinates in metres (`w`) plus latitude and longitude (`g`
 
 ### Outbox rules (bus)
 
-- Lower priority numbers go first. Within a priority, frames go in seq order.
+- Lower priority numbers go first. Within a priority, frames go in the order they were queued. A frame gets its seq when it starts to go out, so seqs follow send order, and a chunked frame finishes before the next one starts.
 - Only the newest `T` waits in the outbox; a new one replaces it.
 - `A`, `N`, `E` and `R` frames also go into a ring of the last 32, which `resend` replays with their original seq.
 - `H` goes out at bus start, after `status`, and every 30 s.
@@ -140,7 +140,7 @@ Argument types (regular expressions over the whole token):
 
 - The hub hands the companion one command per bot at a time (`claim_next_command`). The companion sends it and waits for an `A` or `N` with the same `ref` and `e`: 3 s on transports L, F and C, 5 s on O. It retries after 1, 3 and 8 s, then marks the command `failed_delivery`.
 - An `N` with `ref` 0 (`E_PARSE`) means the line arrived damaged. The companion treats it as a failed attempt at the command in flight and retries.
-- The bus keeps its watermark in one databank key, written in a single call after the handler returns: `dub.last` = `{"e":<epoch>,"c":<cseq>,"k":"A"|"N","b":<reply body>}`. It starts as epoch 0, cseq 0 and no reply.
+- The bus keeps its watermark in one databank key, written in a single call after the handler returns: `dub.last` = `<epoch>|<cseq>|<A or N>|<reply body JSON>`. It starts as epoch 0, cseq 0 and no reply.
 
 For a command with a valid CRC, verb and arguments, compared with the watermark (`last_e`, `last_c`):
 
@@ -165,7 +165,7 @@ The bus writes only `dub.`-prefixed keys in ArchHUD's `dbHud_1`, which ArchHUD n
 | `dub.id` | Bot id |
 | `dub.last` | Watermark and last reply (above) |
 | `dub.job` | Running job as JSON, for resume (Phase 2) |
-| `dub.cfg` | Bus settings as JSON |
+| `dub.cfg.<name>` | Bus settings, read at start: `tick` (0.25 s), `maxline` (400), `lines` per tick (2), `telemetry` period (1 s) |
 | `dub.*` | Anything written with `db set` |
 
 ### Transport F inbox (provisional, pending S11)

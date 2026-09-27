@@ -1,0 +1,8 @@
+return {
+    _all = {
+        lpath = "./?.lua;./spec/helpers/?.lua;./.deps/du-mocks/src/?.lua",
+    },
+    default = {
+        ROOT = { "spec" },
+    },
+}

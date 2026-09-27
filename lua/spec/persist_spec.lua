@@ -1,0 +1,62 @@
+local persist = require("autoconf/custom/dufleet/persist")
+local mockDatabank = require("dumocks.DatabankUnit")
+
+describe("persist", function()
+    local dbMock, store
+
+    before_each(function()
+        dbMock = mockDatabank:new(nil, 1)
+        store = persist.new(dbMock:mockGetClosure())
+    end)
+
+    it("reads a missing key as nil, not as the databank's empty string", function()
+        assert.is_nil(store:get("dub.id"))
+        store:set("dub.id", "")
+        assert.are.equal("", store:get("dub.id"))
+    end)
+
+    it("sets and deletes", function()
+        store:set("dub.x", 5)
+        assert.are.equal("5", store:get("dub.x"))
+        store:del("dub.x")
+        assert.is_nil(store:get("dub.x"))
+    end)
+
+    it("leaves other keys alone", function()
+        dbMock.data.BrakeToggleStatus = true -- one of ArchHUD's own keys
+        store:set("dub.x", "1")
+        store:del("dub.x")
+        assert.are.equal(true, dbMock.data.BrakeToggleStatus)
+    end)
+
+    it("keeps the watermark and last reply in one key", function()
+        assert.are.same({ 0, 0 }, { store:last() })
+        store:setLast(2, 42, "A", '{"e":2,"ref":42}')
+        assert.are.equal('2|42|A|{"e":2,"ref":42}', dbMock.data["dub.last"])
+        assert.are.same({ 2, 42, "A", '{"e":2,"ref":42}' }, { store:last() })
+    end)
+
+    it("survives a restart, because the databank does", function()
+        store:setLast(1, 7, "N", '{"e":1,"err":"E_BUSY","ref":7}')
+        local again = persist.new(dbMock:mockGetClosure())
+        assert.are.same({ 1, 7, "N", '{"e":1,"err":"E_BUSY","ref":7}' }, { again:last() })
+    end)
+
+    it("reports an unreadable watermark", function()
+        store:set("dub.last", "garbage")
+        local e, c, kind, body, problem = store:last()
+        assert.are.same({ 0, 0 }, { e, c })
+        assert.is_nil(kind)
+        assert.is_nil(body)
+        assert.truthy(problem:find("unreadable", 1, true))
+    end)
+
+    it("works in memory without a databank", function()
+        local mem = persist.new(nil)
+        assert.is_false(mem:persistent())
+        mem:set("dub.id", "b1")
+        assert.are.equal("b1", mem:get("dub.id"))
+        mem:setLast(1, 1, "A", '{"e":1,"ref":1}')
+        assert.are.same({ 1, 1, "A", '{"e":1,"ref":1}' }, { mem:last() })
+    end)
+end)

@@ -155,6 +155,7 @@ Items marked *(ADR-0001)* wait for the transport decision. Everything else can s
   - persistence: `dub.`-prefixed keys in ArchHUD's `dbHud_1`, which ArchHUD writes key by key and never clears;
   - `archhud_adapter`: the only module that touches ArchHUD internals.
 - Transports *(ADR-0001)*: `print` (L) or `optical` through `userScreen` (O); `inbox` (F) or chat only (C).
+- Done 2026-09-27 ([lua/README.md](../lua/README.md)): the shim, adapter, dispatcher, builtins, outbox, persistence, codec, and collectors for position, speed, altitude and autopilot mode, under busted and luacheck. Frames go out through `print` until ADR-0001. Still to come: fuel, cargo and body collectors, and the transports.
 
 ### 5. Companion (`companion/`, Python 3.12)
 
