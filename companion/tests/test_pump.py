@@ -193,6 +193,49 @@ def test_a_result_after_a_restart_still_finds_its_command():
     asyncio.run(main())
 
 
+class InstantJobBus(FakeBus):
+    """Ends every job the moment it starts, as a goto the autopilot refuses does: the R frame
+    follows the A in the same tick."""
+
+    async def send(self, line):
+        before = len(self.executed)
+        await super().send(line)
+        if len(self.executed) > before and self.executed[-1][2] == "run":
+            await self.emit("R", {"job": line.split()[4], "skill": "goto", "ok": False, "err": "E_STATE",
+                                  "msg": "no target"})
+
+
+def test_a_result_that_overtakes_its_ack_still_finishes_the_command():
+    async def main():
+        hub, bus, pump = rig(bus=InstantJobBus())
+        hub.queue("run", "goto", "j_9", "pos=0,2,1,2,3")
+        await drive(pump, lambda: hub.status(1) == "failed")
+        assert hub.row(1)["error"] == "E_STATE: no target"
+        assert pump.stats["orphan results"] == 0
+
+    asyncio.run(main())
+
+
+def test_a_result_before_the_replayed_ack_after_restarts():
+    async def main():
+        hub, bus, pump = rig()
+        bus.lose_replies = 1  # the bus starts the job, but its A never arrives
+        hub.queue("run", "goto", "j_5", "pos=0,2,1,2,3")
+        task = asyncio.create_task(pump.run())
+        await until(lambda: bus.executed)
+        task.cancel()  # the companion dies
+        with contextlib.suppress(asyncio.CancelledError):
+            await task
+        _, _, pump2 = rig(hub, bus)  # it restarts, and so does the bus, which cuts the job off
+        await bus.emit("R", {"job": "j_5", "skill": "goto", "ok": False, "err": "E_STATE",
+                             "msg": "interrupted by a restart"})
+        await until(lambda: pump2.stats["held results"] == 1)
+        await drive(pump2, lambda: hub.status(1) == "failed")  # the resent run gets the stored A
+        assert hub.row(1)["error"] == "E_STATE: interrupted by a restart"
+
+    asyncio.run(main())
+
+
 def test_a_restart_mid_delivery_runs_the_command_exactly_once():
     async def main():
         hub, bus, pump = rig()

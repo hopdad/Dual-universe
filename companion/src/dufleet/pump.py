@@ -6,7 +6,10 @@ then give up with failed_delivery. The bus answers a repeat from its stored repl
 so a command never runs twice, even when this process restarts mid-delivery and
 recover_inflight hands the command back.
 
-A `run` command stays acked until the R frame for its job arrives.
+A `run` command stays acked until the R frame for its job arrives. An R can overtake
+its command's A: a job can end in the tick it starts, and after a bus restart the
+"interrupted" R goes out before the replayed A. Such a result is held until the A is
+recorded.
 """
 
 from __future__ import annotations
@@ -62,6 +65,7 @@ class CommandPump:
         self._replies: asyncio.Queue[Message] = asyncio.Queue()
         self._wake = asyncio.Event()
         self._jobs: dict[str, str] = {}
+        self._held: dict[str, Message] = {}  # results that came before their command's A
 
     def on_reply(self, msg: Message) -> None:
         """A or N frames from the router."""
@@ -117,6 +121,9 @@ class CommandPump:
                 await self.hub.command_progress(cmd.id, "acked")
                 job = job_of(cmd)
                 if job:
+                    held = self._held.pop(job, None)
+                    if held is not None:
+                        return await self._finish(cmd.id, held)
                     self._jobs[job] = cmd.id
                     return "acked"
                 await self.hub.command_progress(cmd.id, "done", result=reply.body.get("data"))
@@ -146,17 +153,24 @@ class CommandPump:
         return None
 
     async def on_result(self, msg: Message) -> None:
-        """R frames from the router: finishes the command that started the job."""
+        """R frames from the router: finishes the command that started the job, now or once its
+        A is recorded. Only the last 16 results without a command are held."""
         job = msg.body.get("job")
         command_id = self._jobs.pop(job, None) or await self.hub.acked_command_for_job(self.bot_id, job)
+        command_id = command_id or self._jobs.pop(job, None)  # the A may have been recorded meanwhile
         if command_id is None:
-            self.stats["orphan results"] += 1
-            log.warning("result for unknown job %s", job)
+            self.stats["held results"] += 1
+            self._held[job] = msg
+            while len(self._held) > 16:
+                dropped = self._held.pop(next(iter(self._held)))
+                self.stats["orphan results"] += 1
+                log.warning("result for unknown job %s", dropped.body.get("job"))
             return
+        await self._finish(command_id, msg)
+
+    async def _finish(self, command_id: str, msg: Message) -> str:
         ok = msg.body.get("ok") is True
-        await self.hub.command_progress(
-            command_id,
-            "done" if ok else "failed",
-            error=None if ok else error_text(msg.body),
-            result=msg.body.get("data"),
-        )
+        status = "done" if ok else "failed"
+        await self.hub.command_progress(command_id, status, error=None if ok else error_text(msg.body),
+                                        result=msg.body.get("data"))
+        return status

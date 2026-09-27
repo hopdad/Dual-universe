@@ -15,7 +15,7 @@ The Python process that runs beside each game client. It moves commands from the
 - then claims one command at a time and sends its line;
 - waits for the matching A or N, retrying after 1, 3 and 8 s;
 - records sent, acked, done, failed or failed_delivery;
-- keeps a `run` command acked until its job's R frame arrives.
+- keeps a `run` command acked until its job's R frame arrives, and holds an R that overtakes its A (a job that ends at once, or a restart of the bus).
 
 `dufleet` on the command line:
 - `dufleet cmd VERB [ARGS...]` prints a `/b` line with its CRC, for trying the bus by hand. It keeps a cseq counter in `~/.dufleet/`.
