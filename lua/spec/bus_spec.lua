@@ -82,6 +82,33 @@ describe("bus", function()
             t[1].body)
     end)
 
+    it("reports the body and latitude and longitude on it", function()
+        local h = startBus()
+        _G.planet = { id = 2, systemId = 0, center = { x = 1000, y = 2000, z = 3000 }, radius = 100 }
+        h.construct.position = { 1000, 2100, 3000 } -- on the equator, 90 degrees east
+        h.tick(1)
+        local t = h.ofKind("T")[1].body
+        assert.are.equal(2, t.b)
+        assert.are.same({ 0, 90 }, t.g)
+        _G.planet = { id = 0, systemId = 0, center = { 0, 0, 0 }, radius = 0 } -- in space
+        h.tick(4)
+        t = h.ofKind("T")[2].body
+        assert.are.equal(0, t.b)
+        assert.is_nil(t.g)
+    end)
+
+    it("computes latitude and longitude as ArchHUD does", function()
+        local bus = require("autoconf/custom/dufleet/bus")
+        local body = { center = { 0, 0, 0 } }
+        local lat, lon = bus.latlon({ 0, 0, 150 }, body)
+        assert.are.same({ 90, 0 }, { lat, lon })
+        lat, lon = bus.latlon({ 0, -10, 0 }, body)
+        assert.are.same({ 0, 270 }, { lat, lon })
+        lat, lon = bus.latlon({ -10, 0, -10 }, body)
+        assert.are.equal(-45, math.floor(lat + 0.5))
+        assert.are.equal(180, math.floor(lon + 0.5))
+    end)
+
     it("says hello again every 30 s", function()
         local h = startBus()
         h.tick(30 * 4 + 4)

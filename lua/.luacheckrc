@@ -12,7 +12,7 @@ files["autoconf/custom/archhud/userclass.lua"] = {
 files["spec"] = {
     std = "+busted",
     globals = { "system", "unit", "construct", "core", "dbHud_1", "PROGRAM", "VERSION_NUMBER", "AutopilotStatus",
-        "Autopilot", "AltitudeHold", "BrakeIsOn", "SetupComplete", "userBase", "userScreen" },
+        "Autopilot", "AltitudeHold", "BrakeIsOn", "SetupComplete", "userBase", "userScreen", "planet" },
 }
 
 files["tools/simulate.lua"] = {

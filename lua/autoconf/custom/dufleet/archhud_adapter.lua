@@ -90,6 +90,19 @@ function M.autopilot()
     return "manual"
 end
 
+-- The body ArchHUD currently flies relative to (its global `planet`, the closest body in its
+-- atlas): { id, systemId, center = {x, y, z}, radius }, or nil.
+function M.body()
+    local p = G.planet
+    if type(p) ~= "table" or type(p.id) ~= "number" or type(p.center) ~= "table" or type(p.radius) ~= "number" then
+        return nil
+    end
+    local c = p.center
+    local x, y, z = c.x or c[1], c.y or c[2], c.z or c[3]
+    if type(x) ~= "number" or type(y) ~= "number" or type(z) ~= "number" then return nil end
+    return { id = math.tointeger(p.id) or p.id, systemId = p.systemId, center = { x, y, z }, radius = p.radius }
+end
+
 -- The global ArchHUD adds to its HUD content on each redraw (Transport O).
 function M.setScreen(svg)
     G.userScreen = svg

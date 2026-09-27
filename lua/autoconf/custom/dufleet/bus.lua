@@ -30,6 +30,21 @@ local function round1(x)
     return math.floor(x * 10 + 0.5) / 10
 end
 
+local function round4(x)
+    return math.floor(x * 10000 + 0.5) / 10000
+end
+
+-- Latitude and longitude in degrees of world position p on body b, as ArchHUD computes
+-- them for ::pos (apclass.lua, zeroConvertToMapPosition): longitude in [0, 360).
+function M.latlon(p, b)
+    local dx, dy, dz = p[1] - b.center[1], p[2] - b.center[2], p[3] - b.center[3]
+    local d = math.sqrt(dx * dx + dy * dy + dz * dz)
+    if d == 0 then return 0, 0 end
+    local lon = math.atan(dy, dx)
+    if lon < 0 then lon = lon + 2 * math.pi end
+    return math.deg(math.pi / 2 - math.acos(dz / d)), math.deg(lon)
+end
+
 local Bus = {}
 Bus.__index = Bus
 
@@ -99,6 +114,14 @@ function Bus:sendTelemetry()
     local t = { st = self.state, ap = adapter.autopilot() }
     local p = game.position()
     if p then t.w = { round1(p[1]), round1(p[2]), round1(p[3]) } end
+    local body = adapter.body()
+    if body then
+        t.b = body.id
+        if p and body.id ~= 0 then
+            local lat, lon = M.latlon(p, body)
+            t.g = { round4(lat), round4(lon) }
+        end
+    end
     local v = game.velocity()
     if v then t.v = round1(math.sqrt(v[1] * v[1] + v[2] * v[2] + v[3] * v[3]) * 3.6) end
     local alt = game.altitude()

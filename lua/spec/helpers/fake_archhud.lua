@@ -38,6 +38,7 @@ function M.install(opts)
     VERSION_NUMBER = 2.105
     SetupComplete = true
     Autopilot, AltitudeHold, BrakeIsOn, AutopilotStatus = false, false, false, "Aligning"
+    planet = nil -- ArchHUD's current body; specs set it when they need one
     userBase, userScreen = nil, nil
 
     -- Every test starts from freshly loaded bus modules.
