@@ -1,0 +1,171 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/hopdad/Dual-universe/packages/protocol/protocol.schema.json",
+  "title": "dufleet bot bus protocol, version 1",
+  "description": "Single source of truth for the wire protocol between the in-game bus (Lua) and the companion (Python). docs/protocol.md explains it; codegen.py turns x-protocol into constants for both sides. Frame bodies are validated against $defs.",
+  "x-protocol": {
+    "version": 1,
+    "prefix": "@@DUB",
+    "command_prefix": "/b ",
+    "maxline_default": 400,
+    "command_max": 240,
+    "max_chunks": 99,
+    "min_chunk": 16,
+    "replay_ring": 32,
+    "reassembly_ttl_s": 10,
+    "hello_interval_s": 30,
+    "epoch_max": 65535,
+    "cseq_max": 2147483647,
+    "seq_max": 4294967295,
+    "ack_timeout_s": {"L": 3, "O": 5, "F": 3, "C": 3},
+    "retry_backoff_s": [1, 3, 8],
+    "inbox_module": "autoconf/custom/dufleet/inbox",
+    "kinds": {
+      "H": "hello: boot id, versions, epoch and command watermark; sent at start and on status",
+      "T": "telemetry: the latest state; fire and forget, only the newest is kept",
+      "E": "event",
+      "A": "ack: the command was accepted, or is a replay of the last accepted one",
+      "N": "nack: the command was refused",
+      "R": "result of a skill job",
+      "D": "debug text"
+    },
+    "priority": {"A": 0, "N": 0, "E": 1, "R": 1, "H": 1, "T": 2, "D": 3},
+    "replayable": ["A", "N", "E", "R"],
+    "errors": {
+      "E_PARSE": "command line malformed",
+      "E_CRC": "command CRC mismatch",
+      "E_EPOCH": "command from an older epoch",
+      "E_STATE": "not possible in the current state, or superseded by a newer command",
+      "E_VERB": "unknown or unavailable verb",
+      "E_ARGS": "arguments invalid",
+      "E_BUSY": "another job is running",
+      "E_LINK": "a required element is not linked",
+      "E_FUEL": "not enough fuel",
+      "E_INTERNAL": "bus error; see D frames"
+    },
+    "skills": ["goto", "haul_route", "industry", "patrol", "mine_loop"],
+    "arg_types": {
+      "uint": "^(0|[1-9][0-9]{0,9})$",
+      "bot": "^[A-Za-z0-9_-]{1,16}$",
+      "job": "^j_[A-Za-z0-9]{1,16}$",
+      "dbkey": "^dub\\.[a-z0-9_.]{1,40}$",
+      "kv": "^[a-z][a-z0-9_]{0,15}=[!$-\\[\\]-~]{1,120}$",
+      "text": "^[!$-\\[\\]-~]{1,200}$",
+      "chan": "^[!$-\\[\\]-~]{1,64}$",
+      "b64": "^[A-Za-z0-9+/]+={0,2}$"
+    },
+    "verbs": {
+      "ping": {"doc": "acknowledge only", "args": []},
+      "status": {"doc": "acknowledge, then send H and T", "args": []},
+      "cancel": {"doc": "stop the running job and brake", "args": [{"name": "job", "type": "job", "optional": true}]},
+      "pause": {"doc": "hold the running job", "args": []},
+      "resume": {"doc": "continue a paused job", "args": []},
+      "setid": {"doc": "store the bot id in the databank", "args": [{"name": "id", "type": "bot"}]},
+      "resend": {"doc": "send replayable frames with seq >= from again", "args": [{"name": "from", "type": "uint"}]},
+      "run": {"doc": "start a skill job", "args": [{"name": "skill", "type": "skill"}, {"name": "job", "type": "job"}, {"name": "params", "type": "kv", "variadic": true}]},
+      "db": {"doc": "read, write or delete one dub. databank key", "args": [{"name": "op", "type": "enum", "values": ["get", "set", "del"]}, {"name": "key", "type": "dbkey"}, {"name": "value", "type": "text", "optional": true}]},
+      "cal": {"doc": "optical calibration pattern on or off (Transport O)", "args": [{"name": "state", "type": "enum", "values": ["on", "off"]}]},
+      "relay": {"doc": "Phase 3: forward a payload to a worker board over the emitter", "args": [{"name": "chan", "type": "chan"}, {"name": "payload", "type": "b64"}]}
+    }
+  },
+  "type": "object",
+  "$defs": {
+    "hello": {
+      "type": "object",
+      "required": ["boot", "v", "epoch", "cseq"],
+      "additionalProperties": false,
+      "properties": {
+        "boot": {"type": "string", "pattern": "^[0-9a-z]{4,12}$", "description": "random id of this bus start"},
+        "v": {"type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$", "description": "bus version"},
+        "epoch": {"type": "integer", "minimum": 0, "maximum": 65535},
+        "cseq": {"type": "integer", "minimum": 0, "maximum": 2147483647, "description": "highest command executed in this epoch"},
+        "id": {"type": "string", "maxLength": 16, "description": "bot id from the databank, or empty"},
+        "ah": {"type": "string", "maxLength": 40, "description": "ArchHUD commit the bus expects"},
+        "tr": {"type": "string", "enum": ["L", "O"], "description": "outbound transport in use"},
+        "ml": {"type": "integer", "minimum": 64, "description": "max line length in use"},
+        "q": {"type": "integer", "minimum": 0, "description": "frames waiting in the outbox"}
+      }
+    },
+    "telemetry": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "w": {"type": "array", "items": {"type": "number"}, "minItems": 3, "maxItems": 3, "description": "world position, metres"},
+        "v": {"type": "number", "minimum": 0, "description": "speed, km/h"},
+        "alt": {"type": "number", "description": "altitude above the nearest body's sea level, metres"},
+        "b": {"type": "integer", "minimum": 0, "description": "nearest body id in the atlas"},
+        "g": {"type": "array", "items": {"type": "number"}, "minItems": 2, "maxItems": 2, "description": "latitude and longitude, degrees"},
+        "fuel": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "atmo": {"type": "number", "minimum": 0, "maximum": 1},
+            "space": {"type": "number", "minimum": 0, "maximum": 1},
+            "rocket": {"type": "number", "minimum": 0, "maximum": 1}
+          }
+        },
+        "cargo": {"type": "number", "minimum": 0, "maximum": 1, "description": "fill ratio of linked containers"},
+        "st": {"type": "string", "maxLength": 40, "description": "skill and phase, e.g. goto:travel, or idle"},
+        "ap": {"type": "string", "maxLength": 40, "description": "ArchHUD autopilot mode"},
+        "x": {"type": "object", "description": "experimental fields"}
+      }
+    },
+    "event": {
+      "type": "object",
+      "required": ["ev"],
+      "additionalProperties": false,
+      "properties": {
+        "ev": {"type": "string", "pattern": "^[a-z][a-z0-9_]{0,31}$"},
+        "job": {"type": "string"},
+        "skill": {"type": "string"},
+        "from": {"type": "string"},
+        "to": {"type": "string"},
+        "data": {"type": "object"}
+      }
+    },
+    "ack": {
+      "type": "object",
+      "required": ["ref", "e"],
+      "additionalProperties": false,
+      "properties": {
+        "ref": {"type": "integer", "minimum": 0, "description": "cseq of the command"},
+        "e": {"type": "integer", "minimum": 0, "description": "epoch of the command"},
+        "dup": {"type": "boolean", "description": "a replay of the reply to an already executed command"},
+        "job": {"type": "string"},
+        "data": {"type": "object"}
+      }
+    },
+    "nack": {
+      "type": "object",
+      "required": ["ref", "e", "err"],
+      "additionalProperties": false,
+      "properties": {
+        "ref": {"type": "integer", "minimum": 0, "description": "cseq of the command, 0 if it could not be read"},
+        "e": {"type": "integer", "minimum": 0},
+        "err": {"enum": ["E_PARSE", "E_CRC", "E_EPOCH", "E_STATE", "E_VERB", "E_ARGS", "E_BUSY", "E_LINK", "E_FUEL", "E_INTERNAL"]},
+        "msg": {"type": "string", "maxLength": 120},
+        "dup": {"type": "boolean"}
+      }
+    },
+    "result": {
+      "type": "object",
+      "required": ["job", "skill", "ok"],
+      "additionalProperties": false,
+      "properties": {
+        "job": {"type": "string"},
+        "skill": {"type": "string"},
+        "ok": {"type": "boolean"},
+        "data": {"type": "object"},
+        "err": {"enum": ["E_STATE", "E_BUSY", "E_LINK", "E_FUEL", "E_INTERNAL"]},
+        "msg": {"type": "string", "maxLength": 120}
+      }
+    },
+    "debug": {
+      "type": "object",
+      "required": ["msg"],
+      "additionalProperties": false,
+      "properties": {"msg": {"type": "string", "maxLength": 300}}
+    }
+  },
+  "x-kind-bodies": {"H": "hello", "T": "telemetry", "E": "event", "A": "ack", "N": "nack", "R": "result", "D": "debug"}
+}

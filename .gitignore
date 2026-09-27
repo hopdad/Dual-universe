@@ -4,8 +4,12 @@ docs/verification/luac/*/out/
 docs/verification/luac/*/util/
 docs/verification/luac/*/emmy.config.json
 docs/verification/luac/*/.gitignore
-# Probe kit: local results, Python environment and caches
+# Probe kit results
 spikes/results/
-spikes/host/.venv/
+# Python environments and caches
+.venv/
 __pycache__/
 .pytest_cache/
+.ruff_cache/
+# Lua test dependencies fetched by lua/tools/deps.sh
+lua/.deps/

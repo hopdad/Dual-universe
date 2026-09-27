@@ -119,7 +119,8 @@ Items marked *(ADR-0001)* wait for the transport decision. Everything else can s
   - Split outbound lines at most 7 times.
   - The command CRC covers the UTF-8 bytes between `/b ` and ` #`.
   - One command in flight per bot.
-  - Dedupe by watermark (`dub.cseq_last`) plus the persisted last ACK, both scoped by a hub-issued epoch (`dub.epoch`).
+  - Dedupe by watermark plus the persisted last reply, both scoped by a hub-issued epoch. The epoch travels in every command header (`/b <epoch>.<cseq> ...`), and all three live in one databank key, `dub.last`, written in a single call.
+- Done 2026-09-27: [docs/protocol.md](protocol.md) specifies v1; `packages/protocol` holds the schema, the codegen for Lua and Python, and `vectors.json`. The TypeScript target comes with the dashboard.
 - Positions in commands are written `pos=<systemId>,<bodyId>,<lat>,<lon>,<alt>`, never with the literal `::pos`. ArchHUD treats any chat line containing `::pos` as a new waypoint.
 - *(ADR-0001, Transport F)* Inbox format: a Lua file that returns a data table (the epoch plus pending commands with their CRCs), written atomically as a temp file that is then renamed.
 
@@ -149,7 +150,7 @@ Items marked *(ADR-0001)* wait for the transport decision. Everything else can s
   - parser, which never throws and is fuzzed;
   - dispatcher, a single queue fed by `/b` chat lines, the inbox *(F)* and receivers (Phase 3);
   - dedupe;
-  - builtins: `ping`, `status`, `setid`, `cal`, `resend`, `epoch`;
+  - builtins: `ping`, `status`, `cancel`, `pause`, `resume`, `setid`, `resend`, `db` and `cal` (there is no `epoch` verb: every command carries its epoch);
   - collectors: position and velocity from `construct`, autopilot state from ArchHUD's globals, run round-robin;
   - persistence: `dub.`-prefixed keys in ArchHUD's `dbHud_1`, which ArchHUD writes key by key and never clears;
   - `archhud_adapter`: the only module that touches ArchHUD internals.

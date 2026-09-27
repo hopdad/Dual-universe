@@ -7,7 +7,7 @@ Client-side automation for myDU (self-hosted Dual Universe), only on servers who
 - Lua (in-game) <-> transport <-> Python companion <-> Supabase hub <-> Next.js dashboard; Python LLM planner.
 
 Where to look:
-- Plan and decision gates: docs/plan.md. Decisions: docs/adr/.
+- Plan and decision gates: docs/plan.md. Decisions: docs/adr/. Wire protocol: docs/protocol.md.
 - Verified facts with evidence: docs/verification.md (ArchHUD in its addendum).
 - Original spec: docs/handoff/original-handoff.md (superseded wherever the documents above disagree).
 
