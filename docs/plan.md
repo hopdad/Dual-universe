@@ -105,6 +105,7 @@ Items marked *(ADR-0001)* wait for the transport decision. Everything else can s
   - Python with uv, ruff and pytest.
   - SQL against a PostgreSQL service, reusing the scenarios in `docs/verification/sql/`.
   - Web: Next.js build, lint and a Playwright smoke test.
+- Done 2026-09-27: `.github/workflows/ci.yml` runs the Lua, Python (companion, protocol generators, probe kit) and SQL jobs. The web job comes with the dashboard.
 
 ### 2. Protocol (`packages/protocol`)
 

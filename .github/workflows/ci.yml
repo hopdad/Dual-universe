@@ -1,0 +1,77 @@
+name: ci
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lua:
+    name: Lua bus (busted, luacheck)
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        working-directory: lua
+    steps:
+      - uses: actions/checkout@v7
+      - name: Install Lua 5.3, busted, luacheck and dkjson
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends lua5.3 lua-busted lua-check lua-dkjson
+          sudo update-alternatives --set lua-interpreter /usr/bin/lua5.3
+      - run: ./tools/deps.sh
+      - run: busted
+      - run: luacheck .
+
+  python:
+    name: Protocol, companion and probe kit (pytest, ruff)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10
+      - name: Install Lua 5.3 for the cross-language tests
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends lua5.3 lua-dkjson
+          ./lua/tools/deps.sh
+      - name: Generated constants and vectors are current
+        run: |
+          python3 packages/protocol/codegen.py --check
+          cd companion && uv run python ../packages/protocol/tools/make_vectors.py --check
+      - name: Companion
+        working-directory: companion
+        run: |
+          uv run ruff check . ../packages/protocol
+          uv run pytest
+      - name: Probe kit
+        working-directory: spikes/host
+        run: |
+          uv run ruff check .
+          uv run pytest
+
+  sql:
+    name: Hub migrations and scenarios (PostgreSQL 16)
+    runs-on: ubuntu-24.04
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready --health-interval 5s --health-timeout 5s --health-retries 12
+    env:
+      PGHOST: localhost
+      PGPORT: "5432"
+      PGUSER: postgres
+      PGPASSWORD: postgres
+    steps:
+      - uses: actions/checkout@v7
+      - run: supabase/tests/run.sh
