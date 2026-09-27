@@ -153,7 +153,7 @@ For a command with a valid CRC, verb and arguments, compared with the watermark 
 
 The companion sends one command at a time and only moves on after a reply, so a retry of the last command is always a replay and never runs twice, even if the companion restarts mid-command (`recover_inflight` resends it). A handler refusal (`E_BUSY` and so on) also moves the watermark, so a retry gets the same refusal back.
 
-The hub bumps a bot's epoch when its command sequence restarts, for example after the hub is reset. The first command of the new epoch runs even though its cseq is low.
+The companion passes the `epoch` and `cseq` of every H frame to the hub (`sync_epoch`). If the bot is ahead of the hub, which happens only after the hub lost its numbering (a reset or a restore), the hub moves to a new epoch and cancels its queued commands from the old one. The first command of the new epoch runs even though its cseq is low. See [supabase/README.md](../supabase/README.md).
 
 ### Databank keys
 

@@ -66,8 +66,10 @@ Game files:
 - supabase/:
   - SQL migrations only. RLS on every table, including command_seq.
   - cseq is assigned by the server and immutable; one command in flight per bot; claims take a lease.
-  - Device users write through RPCs (claim_next_command, bot_report, recover_inflight), never the service role.
-  - Scenario tests from docs/verification/sql run in CI.
+  - Device users move commands and report status only through RPCs (claim_next_command, recover_inflight,
+    command_progress, bot_report, sync_epoch), never the service role. Column grants keep epoch, cseq, status and
+    ownership out of client writes.
+  - Scenario tests: supabase/tests/run.sh on plain PostgreSQL (docs/verification/sql keeps the handoff comparison).
 - dashboard/:
   - Next.js 16 App Router: proxy.ts, not middleware.ts.
   - @supabase/ssr with getAll/setAll cookies, getClaims(), and the publishable key.

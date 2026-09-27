@@ -137,6 +137,7 @@ Items marked *(ADR-0001)* wait for the transport decision. Everything else can s
   - The realtime publication.
   - Retention through pg_cron.
 - Run the verification scenarios in CI, as pgTAP or as the existing psql scenarios.
+- Done 2026-09-27 ([supabase/README.md](../supabase/README.md)): migrations `0001`–`0005` with all of the above, plus column-level grants, `command_progress`, `cancel_command` and `sync_epoch` (a hub that lost its numbering moves to a new epoch instead of having every command refused). 16 psql scenarios in `supabase/tests/` run on plain PostgreSQL, and deliberate mutations of the migrations make them fail.
 
 ### 4. Lua bus (`lua/`)
 
