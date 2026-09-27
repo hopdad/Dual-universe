@@ -2,9 +2,9 @@
 --
 -- At start it wraps ArchHUD's chat input and timer entry points (archhud_adapter),
 -- starts its own "dub" timer, and sends H. On each tick it handles one queued command,
--- sends T at the configured rate and H every 30 s, and hands the transport up to
--- `lines` outbound lines. Every entry point runs under pcall, so a bus error becomes a
--- D frame and never stops ArchHUD.
+-- steps the running job (runtime), sends T at the configured rate and H every 30 s, and
+-- hands the transport up to `lines` outbound lines. Every entry point runs under pcall,
+-- so a bus error becomes a D frame and never stops ArchHUD.
 --
 -- Outbound transport for now: system.print (Transport L). The optical transport and
 -- the inbox wait for ADR-0001.
@@ -18,6 +18,9 @@ local game = require("autoconf/custom/dufleet/game")
 local jsonenc = require("autoconf/custom/dufleet/jsonenc")
 local outbox = require("autoconf/custom/dufleet/outbox")
 local persist = require("autoconf/custom/dufleet/persist")
+local runtime = require("autoconf/custom/dufleet/runtime")
+
+local SKILLS = { ["goto"] = require("autoconf/custom/dufleet/skills/goto") }
 
 local M = { VERSION = "0.1.0", TIMER = "dub" }
 
@@ -45,6 +48,13 @@ function M.latlon(p, b)
     return math.deg(math.pi / 2 - math.acos(dz / d)), math.deg(lon)
 end
 
+-- Speed in m/s, or nil.
+function M.speed()
+    local v = game.velocity()
+    if not v then return nil end
+    return math.sqrt(v[1] * v[1] + v[2] * v[2] + v[3] * v[3])
+end
+
 local Bus = {}
 Bus.__index = Bus
 
@@ -52,7 +62,7 @@ Bus.__index = Bus
 function M.new(opts)
     opts = opts or {}
     return setmetatable({ sink = opts.sink or game.print, started = false, errors = 0, lastError = nil,
-        printedErrors = 0, lastDebug = nil, suppressed = 0, state = "idle" }, Bus)
+        printedErrors = 0, lastDebug = nil, suppressed = 0 }, Bus)
 end
 
 function Bus:guard(name, fn, ...)
@@ -111,7 +121,7 @@ function Bus:sendHello()
 end
 
 function Bus:sendTelemetry()
-    local t = { st = self.state, ap = adapter.autopilot() }
+    local t = { st = self.runtime:status(), ap = adapter.autopilot() }
     local p = game.position()
     if p then t.w = { round1(p[1]), round1(p[2]), round1(p[3]) } end
     local body = adapter.body()
@@ -122,8 +132,8 @@ function Bus:sendTelemetry()
             t.g = { round4(lat), round4(lon) }
         end
     end
-    local v = game.velocity()
-    if v then t.v = round1(math.sqrt(v[1] * v[1] + v[2] * v[2] + v[3] * v[3]) * 3.6) end
+    local speed = M.speed()
+    if speed then t.v = round1(speed * 3.6) end
     local alt = game.altitude()
     if alt then t.alt = round1(alt) end
     self.outbox:push("T", jsonenc.encode(t))
@@ -136,9 +146,13 @@ function Bus:start()
     if not self.store:get("dub.schema") then self.store:set("dub.schema", "1") end
     self.cfg = self:config()
     self.outbox = outbox.new()
+    self.runtime = runtime.new({ store = self.store, outbox = self.outbox, skills = SKILLS,
+        env = { ah = adapter, now = game.now, position = game.position, speed = M.speed },
+        log = function(msg) self:debug(msg) end })
     self.handlers = builtins.install({}, {
         store = self.store,
         outbox = self.outbox,
+        runtime = self.runtime,
         sendHello = function() self:sendHello() end,
         sendTelemetry = function() self:sendTelemetry() end,
         setId = function(id)
@@ -158,6 +172,7 @@ function Bus:start()
     game.setTimer(M.TIMER, self.cfg.tick)
     self.started = true
     self:sendHello()
+    self.runtime:recover()
     if not self.store:persistent() then
         self:debug("no databank on ArchHUD's dbHud_1 slot: the watermark will not survive a restart")
     end
@@ -166,6 +181,7 @@ end
 function Bus:tick()
     local t = game.now()
     self.dispatcher:step(1)
+    self.runtime:step(t)
     if t >= self.nextTelemetry then
         self.nextTelemetry = t + self.cfg.telemetry
         self:sendTelemetry()

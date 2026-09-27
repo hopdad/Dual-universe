@@ -23,7 +23,7 @@
 2. The bot bus runs inside the ArchHUD control unit. ArchHUD itself stays unmodified:
    - a small `archhud/userclass.lua` shim requires our modules from `autoconf/custom/dufleet/`;
    - at start, the shim wraps `PROGRAM.controlInput` (chat) and `PROGRAM.onTick` (our own timer tag).
-3. `goto` calls ArchHUD in-process: `ATLAS.AddNewLocation(name, worldPos, true)`, then `AP.ToggleAutopilot()`. Progress comes from ArchHUD's globals and `construct`.
+3. `goto` calls ArchHUD in-process: `ATLAS.AddNewLocation(name, worldPos, true)`, then `AP.ToggleAutopilot()`. Progress comes from ArchHUD's globals and `construct`. (Amended 2026-09-27: `AddNewLocation` selects whichever location sorts first by name, so the bus selects its own through `AtlasOrdered` and `ATLAS.UpdateAutopilotTarget()` before the toggle. See the ArchHUD addendum in [docs/verification.md](../verification.md).)
 4. The optical frame, if ADR-0001 needs it, is drawn through `userScreen`.
 
 ## Consequences

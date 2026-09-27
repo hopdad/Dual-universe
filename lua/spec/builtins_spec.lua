@@ -3,9 +3,20 @@ local builtins = require("autoconf/custom/dufleet/builtins")
 local command = require("autoconf/custom/dufleet/command")
 local outbox = require("autoconf/custom/dufleet/outbox")
 local persist = require("autoconf/custom/dufleet/persist")
+local runtime = require("autoconf/custom/dufleet/runtime")
+
+-- ArchHUD as it looks before its setup finishes. runtime_spec and goto_spec cover the job verbs.
+local STARTING = {
+    setupComplete = function() return false end,
+    busy = function() return nil end,
+    stop = function() return nil, "ArchHUD's AP not found" end,
+}
 
 local function setup()
     local bus = { store = persist.new(nil), outbox = outbox.new(), hellos = 0, telemetry = 0 }
+    bus.runtime = runtime.new({ store = bus.store, outbox = bus.outbox,
+        skills = { ["goto"] = require("autoconf/custom/dufleet/skills/goto") },
+        env = { ah = STARTING, now = function() return 0 end } })
     bus.sendHello = function() bus.hellos = bus.hellos + 1 end
     bus.sendTelemetry = function() bus.telemetry = bus.telemetry + 1 end
     bus.setId = function(id) bus.store:set("dub.id", id) end
@@ -28,8 +39,9 @@ describe("builtins", function()
     it("refuse only with error codes from the schema", function()
         local handlers = setup()
         local cases = {
-            { "pause" }, { "resume" }, { "run", "goto", "j_1" }, { "cal", "on" }, { "relay", "w1", "eyJ9" },
-            { "cancel", "j_1" }, { "db", "set", "dub.last", "x" },
+            { "pause" }, { "resume" }, { "run", "goto", "j_1" }, { "run", "goto", "j_1", "pos=0,2,1,2,3" },
+            { "run", "patrol", "j_1" }, { "cal", "on" }, { "relay", "w1", "eyJ9" }, { "cancel", "j_1" }, { "cancel" },
+            { "db", "set", "dub.last", "x" },
         }
         for _, c in ipairs(cases) do
             local kind, fields = run(handlers, table.unpack(c))

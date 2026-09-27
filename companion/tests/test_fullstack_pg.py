@@ -112,6 +112,30 @@ def test_commands_round_trip_through_the_real_bus():
     asyncio.run(main())
 
 
+def test_a_goto_job_flies_and_finishes_its_command():
+    async def main():
+        c = await Chain().open()
+        # In space, 460 m from where the virtual ship starts: the fake autopilot gets there in a tick,
+        # then goto waits 5 s for the ship to settle.
+        await c.queue("run", "goto", "j_fly1", "pos=0,0,-123000,98765,42")
+
+        async def finished():
+            return (await c.rows())[0]["status"] in ("done", "failed")
+
+        async with running(c.pump):
+            await c.until(finished, timeout=20)
+        row = (await c.rows())[0]
+        assert (row["status"], row["error"], row["job_id"]) == ("done", None, "j_fly1")
+        assert row["result"]["dist"] == 5  # the fake stops 3 m east and 4 m north of the target
+        cur = await c.owner.execute("select data from public.events where bot_id = %s and kind = 'skill_state'"
+                                    " order by id", (c.bot,))
+        moves = [(e["data"]["from"], e["data"]["to"]) for e in await cur.fetchall()]
+        assert moves == [("idle", "engage"), ("engage", "travel"), ("travel", "settle")]
+        await c.close()
+
+    asyncio.run(main())
+
+
 def test_a_companion_restart_mid_command_runs_it_exactly_once():
     async def main():
         c = await Chain().open()

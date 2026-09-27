@@ -205,14 +205,15 @@ Transport adapters *(ADR-0001)*:
 
 - Pre-checks:
   - ArchHUD has finished setting up (`SetupComplete`);
-  - no autopilot mode is active;
-  - fuel is above a threshold;
+  - no travel mode is active, and no ArchHUD route is loaded;
+  - fuel is above a threshold (not yet: needs the fuel collector);
   - the target body is in ArchHUD's atlas (its custom atlas, on servers that change planets).
-- Start: `ATLAS.AddNewLocation("dub-" .. job, worldPos, true)` selects the target, then a single `AP.ToggleAutopilot()` engages it. Never call it twice within 1.5 s: ArchHUD reads that as an orbital-hop request.
+- Start: `ATLAS.AddNewLocation("dub-" .. job, worldPos, true)` adds the target, but selects whichever location sorts first by name, so the bus then selects its own through `AtlasOrdered` and `ATLAS.UpdateAutopilotTarget()`. A single `AP.ToggleAutopilot()` engages it, at least 2 s after the bus's previous toggle: two within 1.5 s make an orbital hop.
 - Covers same-planet travel (vector to target with altitude hold, then landing), planet-to-planet flight (launch, orbit, reentry) and space targets.
-- Arrival: within tolerance, under 1 km/h for 5 s, with all autopilot flags clear.
-- Cancel: stop the autopilot and brake. The exact calls (`AP.ResetAutopilots`, `AP.BrakeToggle`) are fixed after A1.
+- Arrival: no travel mode, under 1 km/h for 5 s, within tolerance: horizontal on a planet (ArchHUD lands under the target), straight in space. Default tolerances 50 m and 1000 m until A1 measures ArchHUD's precision.
+- Cancel and pause: `AP.clearAll()`, throttle 0, and the brake unless it is already set (`AP.BrakeToggle()` would release it). Confirm in A1.
 - Anything running past twice its ETA is cancelled and re-planned.
+- Done 2026-09-27 (offline): the skill runtime (`dufleet/runtime.lua`: one job, `run`, `cancel`, `pause`, `resume`, `skill_state` events, `R`, `dub.job`) and `goto` as above, against a fake ArchHUD built from the pinned source. The full-stack test flies a job through the hub SQL, pump, router and bus. See [docs/protocol.md](protocol.md), "Jobs". Needs A1 before it flies a real ship.
 
 ### Other skills
 
@@ -303,11 +304,12 @@ Answered: the server is The Third Verse, which uses its own atlas (The-Third-Ver
 2. **You:** run the probe kit, following [spikes/README.md](../spikes/README.md). It covers S8, A1, A2, S0, S11, S1, S3, S4 and S10 in one session. At the end, paste back `results/summary.md` and the panel's lines. If there is time, optional step 12 tries the real bus by hand.
 3. **You:** decide where the hub runs (open question 1). A new Supabase project of its own is the simplest choice.
 4. **Claude:** write ADR-0001 from the results, then build the chosen transports and the companion's `run`, `install` and `doctor` on top of what exists.
+5. **You, after A1:** try `goto` by hand with optional step 12 of the probe kit: a short hop on the same planet, then `cancel` mid-flight.
 
 State on 2026-09-27: the transport-independent parts of workstreams 1–6 are built and green in CI:
 - the protocol package;
 - the hub migrations;
-- the Lua bus core;
+- the Lua bus core, with the skill runtime and `goto` (Phase 2, untested in game);
 - the companion's pump, router and Supabase client;
 - the dashboard skeleton.
 

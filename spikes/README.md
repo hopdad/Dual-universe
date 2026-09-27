@@ -193,6 +193,22 @@ Paste each printed line into the Lua chat.
 
 To read frames, copy them from the chat and pipe them into `uv run dufleet decode`. If S0 found the log, use `uv run dufleet decode <log file> --xml` instead.
 
+If A1 showed that ArchHUD flies on the server, you can also try a `goto`:
+1. Pick a clear spot a few hundred metres away on the same planet and copy its `::pos{...}`.
+2. Write it as `pos=` with the five numbers and no `::pos{}`, since the bus refuses any line containing `::pos`:
+
+   ```
+   uv run dufleet cmd run goto j_1 pos=0,2,35.3951,104.1187,285.5413
+   ```
+
+3. Paste the line and keep your hands off the controls. Expect:
+   - an `A` with `"job":"j_1"`;
+   - `E` frames going `idle` to `engage` to `travel` to `settle`;
+   - an `R` once the ship has landed and stood still for 5 s.
+4. Try stopping one mid-flight: start another `goto`, then paste `uv run dufleet cmd cancel`. The ship should brake within 2 s.
+
+Each `goto` needs a new job id (`j_2`, `j_3`, ...). ArchHUD lists the target as `dub-j_1` among its locations until you leave the seat. If anything looks wrong, take over as usual: ArchHUD's own keys still work.
+
 Afterwards, `install --uninstall-probe --apply` removes the bus the same way it removes the probe.
 
 ## Troubleshooting

@@ -1,8 +1,8 @@
--- Handlers for the verbs that need no skill runtime (Phase 1). Verbs whose feature is
--- missing still get a handler, which refuses with E_STATE, so every verb in the schema
--- has one.
+-- The handler for every verb in the schema. Verbs whose feature is missing still get
+-- one, which refuses with E_STATE. The job verbs (run, cancel, pause, resume) go to the
+-- skill runtime.
 --
--- The bus passes itself as `bus`: store, outbox, sendHello(), sendTelemetry(),
+-- The bus passes itself as `bus`: store, outbox, runtime, sendHello(), sendTelemetry(),
 -- setId(id), and optionally calibrate(on) when an optical transport is active.
 
 local M = {}
@@ -50,14 +50,10 @@ function M.install(handlers, bus)
         return "A", {}
     end
 
-    -- Phase 2 replaces these with the skill runtime.
-    handlers.cancel = function(cmd)
-        if cmd.named.job then return refuse("E_STATE", "no job " .. cmd.named.job) end
-        return "A", { data = { idle = true } }
-    end
-    handlers.pause = function() return refuse("E_STATE", "no job running") end
-    handlers.resume = function() return refuse("E_STATE", "no job running") end
-    handlers.run = function(cmd) return refuse("E_STATE", "skill " .. cmd.named.skill .. " not available yet") end
+    handlers.run = function(cmd) return bus.runtime:run(cmd) end
+    handlers.cancel = function(cmd) return bus.runtime:cancel(cmd) end
+    handlers.pause = function() return bus.runtime:pause() end
+    handlers.resume = function() return bus.runtime:resume() end
 
     handlers.cal = function(cmd)
         if not bus.calibrate then return refuse("E_STATE", "no optical transport") end

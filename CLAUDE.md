@@ -42,8 +42,11 @@ same commit):
   - So the bus intercepts /b lines first (it wraps PROGRAM.controlInput at start).
   - And /b arguments never contain "::pos": write pos=sys,body,lat,lon,alt.
 - Timers: script.onTick -> PROGRAM.onTick, which ignores unknown tags. The bus wraps it for its "dub" tag.
-- goto = ATLAS.AddNewLocation(name, worldPos, true), then one AP.ToggleAutopilot(). Two calls within 1.5 s in
-  atmosphere mean "orbital hop".
+- goto = ATLAS.AddNewLocation(name, worldPos, true), which selects the location sorting first by name, so then set
+  AutopilotTargetIndex from AtlasOrdered and call ATLAS.UpdateAutopilotTarget(); then one AP.ToggleAutopilot(). Two
+  calls within 1.5 s in atmosphere mean "orbital hop". Never add a location name twice (ArchHUD's replace path
+  table.remove()s its body-id keyed atlas). A loaded apRoute takes precedence over the selected target.
+- Stop = AP.clearAll(), AP.cmdThrottle(0), then AP.BrakeToggle() only if BrakeIsOn is unset (strings count as set).
 - Handler errors print but do not stop the unit; a CPU overload does. ArchHUD runs a 60 Hz autopilot timer and a
   15 Hz HUD tick.
 - ArchHUD writes only its own keys to dbHud_1 and never clears it. Our keys use the "dub." prefix there.

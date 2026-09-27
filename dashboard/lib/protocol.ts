@@ -115,7 +115,7 @@ export const VERBS = {
     ]
   },
   "cancel": {
-    "doc": "stop the running job and brake",
+    "doc": "stop the ship and end the running job",
     "args": [
       {
         "name": "job",
@@ -148,7 +148,7 @@ export const VERBS = {
     ]
   },
   "pause": {
-    "doc": "hold the running job",
+    "doc": "stop the ship and hold the running job",
     "args": []
   },
   "ping": {

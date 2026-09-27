@@ -85,8 +85,8 @@ def test_each_command_gets_the_right_reply(session):
         ("A", {"ref": 5, "e": 1, "data": {"k": "dub.note", "v": "a|b"}}),
         ("A", {"ref": 5, "e": 1, "data": {"k": "dub.note", "v": "a|b"}, "dup": True}),
         ("N", {"ref": 6, "e": 1, "err": "E_CRC", "msg": "CRC mismatch"}),
-        ("N", {"ref": 6, "e": 1, "err": "E_STATE", "msg": "skill goto not available yet"}),
-        ("N", {"ref": 6, "e": 1, "err": "E_STATE", "msg": "skill goto not available yet", "dup": True}),
+        ("A", {"ref": 6, "e": 1, "job": "j_7a1"}),
+        ("A", {"ref": 6, "e": 1, "job": "j_7a1", "dup": True}),
         ("N", {"ref": 4, "e": 1, "err": "E_STATE", "msg": "superseded by cseq 6"}),
         ("A", {"ref": 1, "e": 2}),
     ]
@@ -102,4 +102,11 @@ def test_frames_carry_the_new_id_and_restart_resets_seq(session):
     seqs = [m.seq for m in session]
     restarts = [i for i in range(1, len(seqs)) if seqs[i] < seqs[i - 1]]
     assert len(restarts) == 1 and seqs[restarts[0]] == 1
-    assert session[restarts[0]].kind == "N" and session[restarts[0]].body.get("dup") is True
+    assert session[restarts[0]].kind == "A" and session[restarts[0]].body.get("dup") is True
+
+
+def test_a_job_cut_off_by_a_restart_is_reported(session):
+    moves = [(m.body["from"], m.body["to"]) for m in session if m.kind == "E" and m.body["ev"] == "skill_state"]
+    assert moves == [("idle", "engage"), ("engage", "travel")]
+    assert [m.body for m in session if m.kind == "R"] == [
+        {"job": "j_7a1", "skill": "goto", "ok": False, "err": "E_STATE", "msg": "interrupted by a restart"}]

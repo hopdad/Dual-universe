@@ -57,8 +57,8 @@
     "verbs": {
       "ping": {"doc": "acknowledge only", "args": []},
       "status": {"doc": "acknowledge, then send H and T", "args": []},
-      "cancel": {"doc": "stop the running job and brake", "args": [{"name": "job", "type": "job", "optional": true}]},
-      "pause": {"doc": "hold the running job", "args": []},
+      "cancel": {"doc": "stop the ship and end the running job", "args": [{"name": "job", "type": "job", "optional": true}]},
+      "pause": {"doc": "stop the ship and hold the running job", "args": []},
       "resume": {"doc": "continue a paused job", "args": []},
       "setid": {"doc": "store the bot id in the databank", "args": [{"name": "id", "type": "bot"}]},
       "resend": {"doc": "send replayable frames with seq >= from again", "args": [{"name": "from", "type": "uint"}]},
