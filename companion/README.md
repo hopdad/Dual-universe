@@ -7,6 +7,7 @@ The Python process that runs beside each game client. It moves commands from the
 | `dufleet.protocol` | The reference codec for [protocol v1](../docs/protocol.md): CRC-16, frames, the deframer, commands, dedupe. `generated.py` comes from `packages/protocol/codegen.py` |
 | `dufleet.hub` | The `Hub` interface the rest depends on: the RPCs in `supabase/migrations/0003_rpc.sql`, plus state, telemetry and event writes |
 | `dufleet.pump` | `CommandPump`, described below |
+| `dufleet.supabase_hub` | `SupabaseHub`: the `Hub` on a Supabase project through supabase-py, signed in as the device user. `watch_commands` wakes the pump on realtime inserts |
 | `dufleet.router` | `FrameRouter`: checks every frame body against the protocol's JSON Schemas, then passes A and N to the pump, sends H to `sync_epoch` and `bot_report`, writes T to `bot_state` (1 Hz) and `telemetry` (every 5 s), E and D as events, and hands R to the pump |
 
 `CommandPump`:
@@ -17,7 +18,6 @@ The Python process that runs beside each game client. It moves commands from the
 - keeps a `run` command acked until its job's R frame arrives.
 
 Not here yet:
-- the Supabase client behind `Hub` (sign-in as the device user, realtime on `commands` to wake the pump);
 - configuration and the CLI (`run`, `install`, `doctor`, `replay`);
 - the transports, which wait for ADR-0001.
 
@@ -33,6 +33,7 @@ uv run ruff check . ../packages/protocol
 
 - `tests/fakes.py`: an in-memory hub with the same rules as the SQL, and a bus built from the reference codec that can lose or garble lines.
 - `tests/test_lua_bus.py`: runs the real Lua bus (`lua/tools/simulate.lua`, needs lua5.3 and `lua/tools/deps.sh`) and reads its output back.
+- `tests/test_supabase_hub.py`: checks `SupabaseHub` against the migrations. Every RPC and parameter it uses must exist, and every column it writes must be one the device may write.
 - `tests/test_pump_pg.py`: runs the pump against the real hub SQL on PostgreSQL. It creates and drops the database `dufleet_pump_test`, so it only runs when asked:
 
   ```sh

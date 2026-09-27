@@ -173,7 +173,7 @@ Core, which needs no ADR:
 - Telemetry sink: `bot_state` at 1 Hz, `telemetry` every 5 s.
 - CLI: `run`, `install`, `doctor`, `replay`.
 
-- Done 2026-09-27 ([companion/README.md](../companion/README.md)): the command pump and frame router behind a `Hub` interface, tested against an in-memory hub, a reference bus, the real Lua bus output, and the real hub SQL on PostgreSQL (including exactly-once delivery across a companion restart). Still to come: the Supabase client, config, CLI and doctor.
+- Done 2026-09-27 ([companion/README.md](../companion/README.md)): the command pump and frame router behind a `Hub` interface, tested against an in-memory hub, a reference bus, the real Lua bus output, and the real hub SQL on PostgreSQL (including exactly-once delivery across a companion restart). The Supabase client (`SupabaseHub`) is in, checked against the migrations. Still to come: config, the CLI and doctor.
 
 Transport adapters *(ADR-0001)*:
 - Out: `ingest/log_tailer` (a `<record>` splitter with `stat()` polling) or `ingest/optical` with a `calibrate` command.
