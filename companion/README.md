@@ -17,8 +17,12 @@ The Python process that runs beside each game client. It moves commands from the
 - records sent, acked, done, failed or failed_delivery;
 - keeps a `run` command acked until its job's R frame arrives.
 
+`dufleet` on the command line:
+- `dufleet cmd VERB [ARGS...]` prints a `/b` line with its CRC, for trying the bus by hand. It keeps a cseq counter in `~/.dufleet/`.
+- `dufleet decode [FILE] [--xml]` turns copied chat lines, or the client's XML log, back into JSON messages.
+
 Not here yet:
-- configuration and the CLI (`run`, `install`, `doctor`, `replay`);
+- configuration and the service commands (`run`, `install`, `doctor`);
 - the transports, which wait for ADR-0001.
 
 The probe kit in `spikes/host` already has the log tail, the optical decoder and the inbox writer as spike code.

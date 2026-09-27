@@ -52,6 +52,30 @@ def test_probe_install_and_uninstall_restores_players_userclass(tmp_path):
     assert not (custom / "dufleet").exists()
 
 
+def test_bus_install_replaces_the_probe_and_uninstalls_cleanly(tmp_path):
+    lua, custom = _lua_tree(tmp_path)
+    args = Namespace(lua_dir=str(lua), archhud=None, atlas=None, probe=True, bus=False, uninstall_probe=False,
+                     no_verify=False, apply=True, results=tmp_path / "results")
+    install.run(args)
+    args.probe, args.bus = False, True
+    install.run(args)
+    shim = custom / "archhud" / "userclass.lua"
+    assert b"dufleet bus shim" in shim.read_bytes()
+    for name in ("bus.lua", "dispatcher.lua", "protocol_gen.lua", "archhud_adapter.lua"):
+        assert (custom / "dufleet" / name).is_file(), name
+    args.bus, args.uninstall_probe = False, True
+    install.run(args)
+    assert not shim.exists() and not (custom / "dufleet").exists()
+
+
+def test_probe_and_bus_together_are_refused(tmp_path):
+    lua, _ = _lua_tree(tmp_path)
+    args = Namespace(lua_dir=str(lua), archhud=None, atlas=None, probe=True, bus=True, uninstall_probe=False,
+                     no_verify=False, apply=False, results=tmp_path / "results")
+    with pytest.raises(SystemExit):
+        install.run(args)
+
+
 def test_uninstall_keeps_a_userclass_that_is_not_ours(tmp_path):
     lua, custom = _lua_tree(tmp_path)
     own = custom / "archhud" / "userclass.lua"

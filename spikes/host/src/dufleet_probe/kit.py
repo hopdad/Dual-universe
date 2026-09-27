@@ -15,6 +15,9 @@ LUA_SOURCE = KIT_DIR / "lua" / "autoconf" / "custom"
 LUA_TESTS = KIT_DIR / "lua" / "tests"
 DEFAULT_RESULTS = KIT_DIR / "results"
 
+# The real bus, from the repository's lua/ folder (install --bus).
+BUS_SOURCE = KIT_DIR.parent / "lua" / "autoconf" / "custom"
+
 PROBE_FILES = (
     "archhud/userclass.lua",
     "dufleet/probe.lua",
@@ -42,3 +45,8 @@ def save_json(results_dir: Path, name: str, data: Any) -> Path:
 
 def load_json(path: Path) -> Any:
     return json.loads(path.read_text(encoding="utf-8"))
+
+
+def bus_files() -> list[str]:
+    """The bus's files under autoconf/custom: the userclass.lua shim and every dufleet/*.lua module."""
+    return ["archhud/userclass.lua", *sorted(f"dufleet/{p.name}" for p in (BUS_SOURCE / "dufleet").glob("*.lua"))]

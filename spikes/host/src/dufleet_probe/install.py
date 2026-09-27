@@ -1,9 +1,10 @@
-"""Puts ArchHUD, The Third Verse's atlas and the probe into the game's Lua folder.
+"""Puts ArchHUD, The Third Verse's atlas and the probe (or the real bus) into the game's Lua folder.
 
 Dry run by default: prints what it would do. Add --apply to write. Upstream files are
 checked against the SHA-256 pins in pins.py. An existing file that differs is copied
 to autoconf/custom/_dufleet_backup/<time>/ before it is replaced, and
---uninstall-probe puts back a userclass.lua the install had replaced.
+--uninstall-probe removes the probe or the bus and puts back a userclass.lua the
+install had replaced.
 """
 
 from __future__ import annotations
@@ -20,11 +21,15 @@ from pathlib import Path
 
 from dufleet_probe import pins
 from dufleet_probe.gamepaths import custom_dir, find_lua_dir
-from dufleet_probe.kit import LUA_SOURCE, PROBE_FILES, save_json, sha256_bytes, sha256_file
+from dufleet_probe.kit import BUS_SOURCE, LUA_SOURCE, PROBE_FILES, bus_files, save_json, sha256_bytes, sha256_file
 
 BACKUP_DIR = "_dufleet_backup"
 SHIM = "archhud/userclass.lua"
-SHIM_MARKER = b"dufleet probe shim"
+SHIM_MARKERS = (b"dufleet probe shim", b"dufleet bus shim")
+
+
+def _ours(data: bytes) -> bool:
+    return any(marker in data for marker in SHIM_MARKERS)
 
 
 @dataclass
@@ -97,6 +102,10 @@ def probe_files() -> list[Write]:
     return [Write(rel, (LUA_SOURCE / rel).read_bytes(), "probe kit") for rel in PROBE_FILES]
 
 
+def bus_files_to_write() -> list[Write]:
+    return [Write(rel, (BUS_SOURCE / rel).read_bytes(), "lua/") for rel in bus_files()]
+
+
 def apply_writes(custom: Path, writes: list[Write], stamp: str, dry_run: bool) -> dict:
     report: dict[str, list[str]] = {"written": [], "unchanged": [], "backed_up": []}
     backup_root = custom / BACKUP_DIR / stamp
@@ -124,18 +133,18 @@ def uninstall_probe(custom: Path, dry_run: bool) -> dict:
     report: dict[str, list[str]] = {"removed": [], "restored": [], "kept": []}
     shim = custom / SHIM
     if shim.is_file():
-        if SHIM_MARKER in shim.read_bytes():
+        if _ours(shim.read_bytes()):
             report["removed"].append(SHIM)
             if not dry_run:
                 shim.unlink()
             backups = sorted((custom / BACKUP_DIR).glob(f"*/{SHIM}")) if (custom / BACKUP_DIR).is_dir() else []
-            previous = [b for b in backups if SHIM_MARKER not in b.read_bytes()]
+            previous = [b for b in backups if not _ours(b.read_bytes())]
             if previous:  # the player's own userclass.lua, replaced by an earlier install
                 report["restored"].append(str(previous[-1]))
                 if not dry_run:
                     shutil.copy2(previous[-1], shim)
         else:
-            report["kept"].append(SHIM + " (not the probe's)")
+            report["kept"].append(SHIM + " (not the probe's or the bus's)")
     folder = custom / "dufleet"
     if folder.is_dir():
         for path in sorted(folder.iterdir()):
@@ -165,10 +174,14 @@ def run(args) -> int:
             writes += archhud_files(args.archhud, not args.no_verify)
         if args.atlas:
             writes.append(atlas_file(args.atlas, not args.no_verify))
+        if args.probe and getattr(args, "bus", False):
+            raise SystemExit("--probe and --bus both own userclass.lua: pick one")
         if args.probe:
             writes += probe_files()
+        if getattr(args, "bus", False):
+            writes += bus_files_to_write()
         if not writes:
-            raise SystemExit("Nothing to do: pass --archhud, --atlas, --probe or --uninstall-probe")
+            raise SystemExit("Nothing to do: pass --archhud, --atlas, --probe, --bus or --uninstall-probe")
         result["install"] = apply_writes(custom, writes, time.strftime("%Y%m%d-%H%M%S"), dry_run)
     for section in ("install", "uninstall"):
         for key, items in result.get(section, {}).items():
@@ -186,7 +199,10 @@ def add_parser(sub) -> None:
     p.add_argument("--archhud", metavar="fetch|FOLDER|ZIP", help="install ArchHUD 2.105 (pinned)")
     p.add_argument("--atlas", metavar="fetch|FILE", help="install The Third Verse's atlas.lua (pinned)")
     p.add_argument("--probe", action="store_true", help="install the probe (userclass.lua shim and dufleet/)")
-    p.add_argument("--uninstall-probe", action="store_true", help="remove the probe, restore a replaced userclass.lua")
+    p.add_argument("--bus", action="store_true",
+                   help="install the real bus from lua/ instead of the probe (optional, after the spikes)")
+    p.add_argument("--uninstall-probe", action="store_true",
+                   help="remove the probe or the bus, restore a replaced userclass.lua")
     p.add_argument("--no-verify", action="store_true", help="accept upstream files that do not match the pins")
     p.add_argument("--apply", action="store_true", help="actually write (default: dry run)")
     p.set_defaults(func=run)

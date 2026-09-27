@@ -169,6 +169,32 @@ uv run dufleet-probe install --uninstall-probe --apply
 
 This removes the shim and `dufleet\`, and restores a `userclass.lua` the install had replaced. ArchHUD and the atlas stay.
 
+### 12. Optional: try the real bus
+
+This step is only for when you have time left after the spikes. It swaps the probe for the bot bus under development (`lua/`), with frames going to the Lua chat.
+
+```
+uv run dufleet-probe install --bus --apply
+```
+
+Sit back in the seat. Then, in a second terminal, make command lines with correct CRCs:
+
+```
+cd companion
+uv run dufleet cmd ping
+uv run dufleet cmd setid hauler-1
+uv run dufleet cmd status
+```
+
+Paste each printed line into the Lua chat.
+- Each line gets an `@@DUB|1|...|A|...` reply.
+- `status` is also followed by `H` and `T` frames.
+- `dufleet cmd` counts cseq up by itself. If the bus answers `E_STATE` ("superseded"), its databank already holds a later cseq: add `--epoch 2`.
+
+To read frames, copy them from the chat and pipe them into `uv run dufleet decode`. If S0 found the log, use `uv run dufleet decode <log file> --xml` instead.
+
+Afterwards, `install --uninstall-probe --apply` removes the bus the same way it removes the probe.
+
 ## Troubleshooting
 
 - **No panel:**
