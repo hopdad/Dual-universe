@@ -1,12 +1,15 @@
 -- Runs the bus inside the fake ArchHUD (spec/helpers) and prints every outbound line.
 --
---   lua5.3 lua/tools/simulate.lua < script.txt
+--   lua5.3 lua/tools/simulate.lua < script.txt          batch: print everything at the end
+--   lua5.3 lua/tools/simulate.lua --interactive         a virtual game client for the companion
 --
 -- Each input line is typed into chat, except:
 --   tick N    advance N timer ticks of 0.25 s
 --   restart   stop the unit and start it again on the same databank
--- At the end it runs 40 more ticks so the outbox drains. Needs tools/deps.sh and
--- dkjson. companion/tests/test_lua_bus.py feeds the output to the Python deframer.
+-- Batch mode runs 40 more ticks at the end so the outbox drains. Interactive mode writes
+-- the bus's lines out after every input line (companion/src/dufleet/sim.py drives it).
+-- Needs tools/deps.sh and dkjson. companion/tests/test_lua_bus.py feeds the batch
+-- output to the Python deframer.
 
 local root = (arg and arg[0] or ""):match("^(.*)/tools/[^/]*$") or "."
 package.path = root .. "/?.lua;" .. root .. "/spec/helpers/?.lua;" .. root .. "/.deps/du-mocks/src/?.lua;"
@@ -26,6 +29,13 @@ local function collect(h)
     h.printed = {}
 end
 
+local interactive = arg and arg[1] == "--interactive"
+local function flush()
+    for _, line in ipairs(out) do io.write(line, "\n") end
+    out = {}
+    io.stdout:flush()
+end
+
 local h = start()
 for line in io.lines() do
     local n = line:match("^tick (%d+)$")
@@ -38,7 +48,11 @@ for line in io.lines() do
     else
         h.type(line)
     end
+    if interactive then
+        collect(h)
+        flush()
+    end
 end
-h.tick(40)
+if not interactive then h.tick(40) end
 collect(h)
-for _, line in ipairs(out) do io.write(line, "\n") end
+flush()

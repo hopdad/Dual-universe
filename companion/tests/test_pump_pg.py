@@ -7,36 +7,19 @@ for a server where the tests may create and drop the database dufleet_pump_test.
 import asyncio
 import contextlib
 import json
-import os
 import uuid
 
 import pytest
 from fakes import FakeBus
-from pg_hub import PgHub, connect_as, create_database
+from pg_hub import DB, DEVICE, OWNER, PgHub, connect_as
 
 from dufleet.protocol import encode_frame
 from dufleet.pump import CommandPump
 from dufleet.router import FrameRouter
 
-pytestmark = pytest.mark.skipif(not os.environ.get("DUFLEET_PG_TESTS"), reason="set DUFLEET_PG_TESTS=1")
+pytestmark = pytest.mark.usefixtures("pg_database")
 
-DB = "dufleet_pump_test"
-OWNER = "aaaaaaaa-0000-0000-0000-000000000001"
-DEVICE = "dddddddd-0000-0000-0000-000000000003"
 FAST = {"ack_timeout": 0.25, "backoff": (0.01, 0.01, 0.01), "poll_s": 0.01}
-
-
-@pytest.fixture(scope="module", autouse=True)
-def database():
-    create_database(DB)
-
-    async def users():
-        conn = await connect_as(DB, OWNER)
-        await conn.execute("reset role")
-        await conn.execute("insert into auth.users (id, email) values (%s, 'owner'), (%s, 'device')", (OWNER, DEVICE))
-        await conn.close()
-
-    asyncio.run(users())
 
 
 class Rig:
@@ -191,7 +174,8 @@ def test_state_telemetry_and_events_reach_the_owner():
         for kind, seq, body in (("T", 1, t), ("E", 2, '{"ev":"skill_state","to":"travel"}')):
             for line in encode_frame("b1", kind, seq, body):
                 await r.router.feed(line)
-        cur = await r.owner.execute("select wx, speed_kmh, skill, skill_phase, autopilot from public.bot_state")
+        cur = await r.owner.execute("select wx, speed_kmh, skill, skill_phase, autopilot from public.bot_state"
+                                    " where bot_id = %s", (r.bot,))
         assert await cur.fetchone() == {"wx": 1, "speed_kmh": 18, "skill": "goto", "skill_phase": "travel",
                                         "autopilot": "manual"}
         cur = await r.owner.execute("select count(*) as n from public.telemetry where bot_id = %s", (r.bot,))

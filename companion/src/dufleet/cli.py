@@ -7,14 +7,22 @@
         Decodes @@DUB lines from text pasted on stdin or a file into one JSON message per
         line. --xml reads the client's XML log: the <message> of each <record>, unescaped.
 
-The service itself (hub, pump, transports) comes with ADR-0001.
+    dufleet sim --bot BOT_UUID
+        Runs a virtual bot: the real Lua bus in a fake ArchHUD (lua/tools/simulate.lua),
+        wired to the hub as the bot's device user. Set DUFLEET_SUPABASE_URL,
+        DUFLEET_SUPABASE_KEY (publishable), DUFLEET_DEVICE_EMAIL and DUFLEET_DEVICE_PASSWORD.
+
+The service for real clients (transports, run, install, doctor) comes with ADR-0001.
 """
 
 from __future__ import annotations
 
 import argparse
+import asyncio
 import html
 import json
+import logging
+import os
 import re
 import sys
 from pathlib import Path
@@ -70,6 +78,40 @@ def decode(args: argparse.Namespace) -> int:
     return 0
 
 
+async def _sim(bot: str) -> None:
+    from dufleet.pump import CommandPump
+    from dufleet.router import FrameRouter
+    from dufleet.sim import LuaSim
+    from dufleet.supabase_hub import SupabaseHub
+
+    names = ("SUPABASE_URL", "SUPABASE_KEY", "DEVICE_EMAIL", "DEVICE_PASSWORD")
+    env = {k: os.environ.get(f"DUFLEET_{k}") for k in names}
+    missing = [f"DUFLEET_{k}" for k, v in env.items() if not v]
+    if missing:
+        raise SystemExit("set " + ", ".join(missing))
+    hub = await SupabaseHub.connect(env["SUPABASE_URL"], env["SUPABASE_KEY"], env["DEVICE_EMAIL"],
+                                    env["DEVICE_PASSWORD"])
+    sim = LuaSim()
+    pump = CommandPump(hub, bot, sim.send, transport="C")
+    sim.on_line = FrameRouter(hub, bot, pump).feed
+    await sim.start()
+    await hub.watch_commands(bot, pump.wake)
+    print(f"virtual bot running for {bot}; Ctrl+C stops it", file=sys.stderr)
+    try:
+        await pump.run()
+    finally:
+        await sim.close()
+
+
+def sim(args: argparse.Namespace) -> int:
+    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
+    try:
+        asyncio.run(_sim(args.bot))
+    except KeyboardInterrupt:
+        pass
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="dufleet", description=__doc__,
                                      formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -88,6 +130,10 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("file", nargs="?", type=Path, help="default: stdin")
     p.add_argument("--xml", action="store_true", help="unescape XML entities (the client's log file)")
     p.set_defaults(func=decode)
+
+    p = sub.add_parser("sim", help="run a virtual bot (the real Lua bus without the game) against the hub")
+    p.add_argument("--bot", required=True, help="the bot's id (uuid) in the hub")
+    p.set_defaults(func=sim)
 
     args = parser.parse_args(argv)
     return args.func(args)

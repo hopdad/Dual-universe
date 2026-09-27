@@ -18,6 +18,9 @@ from psycopg.types.json import Jsonb
 from dufleet.hub import BotReport, CommandRow
 
 ROOT = Path(__file__).resolve().parents[2]
+DB = "dufleet_pump_test"
+OWNER = "aaaaaaaa-0000-0000-0000-000000000001"
+DEVICE = "dddddddd-0000-0000-0000-000000000003"
 STATE_COLUMNS = ("wx", "wy", "wz", "body_id", "lat", "lon", "alt", "speed_kmh", "fuel", "cargo_ratio", "skill",
                  "skill_phase", "autopilot")
 
@@ -92,3 +95,11 @@ class PgHub:
     async def insert_event(self, bot_id: str, kind: str, severity: int, data: dict[str, Any]) -> None:
         await self.conn.execute("insert into public.events (bot_id, kind, severity, data) values (%s, %s, %s, %s)",
                                 (bot_id, kind, severity, Jsonb(data)))
+
+
+def prepare_database() -> str:
+    """DB, freshly created, with the owner and device users that the Postgres tests sign in as."""
+    create_database(DB)
+    with psycopg.connect(dbname=DB, autocommit=True) as conn:
+        conn.execute("insert into auth.users (id, email) values (%s, 'owner'), (%s, 'device')", (OWNER, DEVICE))
+    return DB

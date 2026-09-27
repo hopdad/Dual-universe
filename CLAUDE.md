@@ -93,7 +93,8 @@ Game files:
   After a schema change: python packages/protocol/codegen.py, then (in companion/)
   uv run python ../packages/protocol/tools/make_vectors.py.
 - CI (.github/workflows/ci.yml) runs all of these plus supabase/tests/run.sh on PostgreSQL 16, and the pump tests
-  against the real hub SQL (companion/tests/test_pump_pg.py, opt-in locally with DUFLEET_PG_TESTS=1).
+  against the real hub SQL, including the full chain with the real Lua bus (companion/tests/test_pump_pg.py and
+  test_fullstack_pg.py, opt-in locally with DUFLEET_PG_TESTS=1).
 
 ## When unsure
 - DU API behaviour not in the Codex or du-mocks: add a spike to docs/spikes.md; do not guess.

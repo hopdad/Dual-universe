@@ -20,6 +20,7 @@ The Python process that runs beside each game client. It moves commands from the
 `dufleet` on the command line:
 - `dufleet cmd VERB [ARGS...]` prints a `/b` line with its CRC, for trying the bus by hand. It keeps a cseq counter in `~/.dufleet/`.
 - `dufleet decode [FILE] [--xml]` turns copied chat lines, or the client's XML log, back into JSON messages.
+- `dufleet sim --bot BOT_UUID` runs a virtual bot against a Supabase project: the real Lua bus in its fake ArchHUD (`dufleet.sim.LuaSim`), signed in as the bot's device user. Set `DUFLEET_SUPABASE_URL`, `DUFLEET_SUPABASE_KEY`, `DUFLEET_DEVICE_EMAIL` and `DUFLEET_DEVICE_PASSWORD`. Then queue `ping` on the dashboard and watch it come back.
 
 Not here yet:
 - configuration and the service commands (`run`, `install`, `doctor`);
@@ -38,7 +39,8 @@ uv run ruff check . ../packages/protocol
 - `tests/fakes.py`: an in-memory hub with the same rules as the SQL, and a bus built from the reference codec that can lose or garble lines.
 - `tests/test_lua_bus.py`: runs the real Lua bus (`lua/tools/simulate.lua`, needs lua5.3 and `lua/tools/deps.sh`) and reads its output back.
 - `tests/test_supabase_hub.py`: checks `SupabaseHub` against the migrations. Every RPC and parameter it uses must exist, and every column it writes must be one the device may write.
-- `tests/test_pump_pg.py`: runs the pump against the real hub SQL on PostgreSQL. It creates and drops the database `dufleet_pump_test`, so it only runs when asked:
+- `tests/test_fullstack_pg.py`: the whole chain without the game: hub SQL, pump and router, and the real Lua bus through `LuaSim`. Round trips stay under the 5 s acceptance bound, and a companion restart mid-command still runs it once.
+- `tests/test_pump_pg.py`: runs the pump against the real hub SQL on PostgreSQL. Both Postgres suites create and drop the database `dufleet_pump_test`, so they only run when asked:
 
   ```sh
   DUFLEET_PG_TESTS=1 PGHOST=... PGPORT=... PGUSER=postgres uv run pytest
