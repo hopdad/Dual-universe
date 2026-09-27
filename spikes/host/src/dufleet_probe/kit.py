@@ -48,5 +48,7 @@ def load_json(path: Path) -> Any:
 
 
 def bus_files() -> list[str]:
-    """The bus's files under autoconf/custom: the userclass.lua shim and every dufleet/*.lua module."""
-    return ["archhud/userclass.lua", *sorted(f"dufleet/{p.name}" for p in (BUS_SOURCE / "dufleet").glob("*.lua"))]
+    """The bus's files under autoconf/custom: the userclass.lua shim and every module under dufleet/,
+    subfolders (dufleet/skills/) included."""
+    modules = sorted(p.relative_to(BUS_SOURCE).as_posix() for p in (BUS_SOURCE / "dufleet").rglob("*.lua"))
+    return ["archhud/userclass.lua", *modules]

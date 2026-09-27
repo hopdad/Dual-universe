@@ -146,14 +146,18 @@ def uninstall_probe(custom: Path, dry_run: bool) -> dict:
         else:
             report["kept"].append(SHIM + " (not the probe's or the bus's)")
     folder = custom / "dufleet"
-    if folder.is_dir():
-        for path in sorted(folder.iterdir()):
+    if folder.is_dir():  # all ours: the probe or the bus, with its subfolders
+        for path in sorted(folder.rglob("*")):
             if path.is_file():
-                report["removed"].append(f"dufleet/{path.name}")
+                report["removed"].append(path.relative_to(custom).as_posix())
                 if not dry_run:
                     path.unlink()
-        if not dry_run and not any(folder.iterdir()):
-            folder.rmdir()
+        if not dry_run:
+            for path in sorted((p for p in folder.rglob("*") if p.is_dir()), key=lambda p: len(p.parts), reverse=True):
+                if not any(path.iterdir()):
+                    path.rmdir()
+            if not any(folder.iterdir()):
+                folder.rmdir()
     return report
 
 

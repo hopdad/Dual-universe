@@ -61,7 +61,8 @@ def test_bus_install_replaces_the_probe_and_uninstalls_cleanly(tmp_path):
     install.run(args)
     shim = custom / "archhud" / "userclass.lua"
     assert b"dufleet bus shim" in shim.read_bytes()
-    for name in ("bus.lua", "dispatcher.lua", "protocol_gen.lua", "archhud_adapter.lua"):
+    for name in ("bus.lua", "dispatcher.lua", "protocol_gen.lua", "archhud_adapter.lua", "runtime.lua",
+                 "skills/goto.lua"):
         assert (custom / "dufleet" / name).is_file(), name
     args.bus, args.uninstall_probe = False, True
     install.run(args)
