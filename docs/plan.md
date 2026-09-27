@@ -300,5 +300,15 @@ Answered: the server is The Third Verse, which uses its own atlas (The-Third-Ver
 ## Next steps
 
 1. **You:** get the admin's written permission (S9).
-2. **You:** run the probe kit, following [spikes/README.md](../spikes/README.md). It covers S8, A1, A2, S0, S11, S1, S3, S4 and S10 in one session. At the end, paste back `results/summary.md` and the panel's lines.
-3. **Claude:** write ADR-0001 from the results. In parallel, start Phase 1 workstreams 1–3 and the transport-independent parts of 4–6.
+2. **You:** run the probe kit, following [spikes/README.md](../spikes/README.md). It covers S8, A1, A2, S0, S11, S1, S3, S4 and S10 in one session. At the end, paste back `results/summary.md` and the panel's lines. If there is time, optional step 12 tries the real bus by hand.
+3. **You:** decide where the hub runs (open question 1). A new Supabase project of its own is the simplest choice.
+4. **Claude:** write ADR-0001 from the results, then build the chosen transports and the companion's `run`, `install` and `doctor` on top of what exists.
+
+State on 2026-09-27: the transport-independent parts of workstreams 1–6 are built and green in CI:
+- the protocol package;
+- the hub migrations;
+- the Lua bus core;
+- the companion's pump, router and Supabase client;
+- the dashboard skeleton.
+
+The "Done" notes under each workstream give the details.
