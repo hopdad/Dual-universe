@@ -12,7 +12,15 @@
         wired to the hub as the bot's device user. Set DUFLEET_SUPABASE_URL,
         DUFLEET_SUPABASE_KEY (publishable), DUFLEET_DEVICE_EMAIL and DUFLEET_DEVICE_PASSWORD.
 
-The service for real clients (transports, run, install, doctor) comes with ADR-0001.
+    dufleet install [--archhud fetch|FOLDER|ZIP] [--atlas fetch|FILE] [--apply]
+        Puts the bus (from lua/), and optionally ArchHUD and the atlas at their pinned
+        versions, into the game's Lua folder. A dry run unless --apply; replaced files are
+        backed up under autoconf/custom/_dufleet_backup/.
+    dufleet doctor [--json]
+        Checks the game folder: ArchHUD and the atlas against their pins, the bus against
+        lua/. Exits 1 if a check fails.
+
+The service for real clients (the transports and `run`) comes with ADR-0001.
 """
 
 from __future__ import annotations
@@ -25,9 +33,10 @@ import logging
 import os
 import re
 import sys
+from dataclasses import asdict
 from pathlib import Path
 
-from dufleet import __version__
+from dufleet import __version__, gamefiles
 from dufleet.protocol import CommandError, Deframer, build_command
 from dufleet.router import VALIDATORS
 
@@ -112,6 +121,59 @@ def sim(args: argparse.Namespace) -> int:
     return 0
 
 
+def _warn(message: str) -> None:
+    print("warning: " + message, file=sys.stderr)
+
+
+def _print_checks(checks: list[gamefiles.Check]) -> None:
+    for c in checks:
+        print(f"{c.status:4}  {c.name:9}  {c.detail}")
+
+
+def install(args: argparse.Namespace) -> int:
+    lua = gamefiles.find_lua_dir(args.lua_dir)
+    if lua is None or not gamefiles.custom_dir(lua).is_dir():
+        where = gamefiles.custom_dir(lua) if lua else "the game's Lua folder"
+        print(f"{where} not found; pass --lua-dir (the game's data\\lua folder) or set DUFLEET_GAME_DIR",
+              file=sys.stderr)
+        return 2
+    files: dict[str, bytes] = {}
+    try:
+        if args.archhud:
+            files.update(gamefiles.archhud_files(args.archhud, not args.no_verify, _warn))
+        if args.atlas:
+            files.update(gamefiles.atlas_file(args.atlas, not args.no_verify, _warn))
+    except gamefiles.InstallError as exc:
+        print(exc, file=sys.stderr)
+        return 2
+    if not args.no_bus:
+        files.update(gamefiles.bus_files())
+    if not files:
+        print("nothing to install: --no-bus without --archhud or --atlas", file=sys.stderr)
+        return 2
+    report = gamefiles.install(gamefiles.custom_dir(lua), files, apply=args.apply)
+    for key in ("written", "unchanged", "backed_up", "removed"):
+        for rel in getattr(report, key):
+            print(f"  {key.replace('_', ' '):10} {rel}")
+    if not args.apply:
+        print("Dry run: nothing was written. Add --apply to do it.")
+        return 0
+    if report.backup_dir:
+        print(f"Replaced files were backed up to {report.backup_dir}")
+    print()
+    _print_checks(gamefiles.doctor(lua))
+    return 0
+
+
+def doctor(args: argparse.Namespace) -> int:
+    checks = gamefiles.doctor(gamefiles.find_lua_dir(args.lua_dir))
+    if args.json:
+        print(json.dumps([asdict(c) for c in checks]))
+    else:
+        _print_checks(checks)
+    return 1 if any(c.status == "fail" for c in checks) else 0
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="dufleet", description=__doc__,
                                      formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -134,6 +196,21 @@ def main(argv: list[str] | None = None) -> int:
     p = sub.add_parser("sim", help="run a virtual bot (the real Lua bus without the game) against the hub")
     p.add_argument("--bot", required=True, help="the bot's id (uuid) in the hub")
     p.set_defaults(func=sim)
+
+    p = sub.add_parser("install", help="put the bus, ArchHUD and the atlas into the game's Lua folder")
+    p.add_argument("--lua-dir", help="the game's data\\lua folder (default: detected)")
+    p.add_argument("--archhud", metavar="fetch|FOLDER|ZIP", help=f"also ArchHUD {gamefiles.pins.ARCHHUD_VERSION} "
+                   "(pinned): download it, or take it from a checkout or a zip of the repository")
+    p.add_argument("--atlas", metavar="fetch|FILE", help="also The Third Verse's atlas.lua (pinned)")
+    p.add_argument("--no-bus", action="store_true", help="leave the bus out")
+    p.add_argument("--no-verify", action="store_true", help="accept upstream files that do not match the pins")
+    p.add_argument("--apply", action="store_true", help="write (default: show what would change)")
+    p.set_defaults(func=install)
+
+    p = sub.add_parser("doctor", help="check ArchHUD, the atlas and the bus in the game's Lua folder")
+    p.add_argument("--lua-dir", help="the game's data\\lua folder (default: detected)")
+    p.add_argument("--json", action="store_true", help="print the checks as JSON")
+    p.set_defaults(func=doctor)
 
     args = parser.parse_args(argv)
     return args.func(args)

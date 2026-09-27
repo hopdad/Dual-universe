@@ -173,7 +173,7 @@ Core, which needs no ADR:
 - Telemetry sink: `bot_state` at 1 Hz, `telemetry` every 5 s.
 - CLI: `run`, `install`, `doctor`, `replay`.
 
-- Done 2026-09-27 ([companion/README.md](../companion/README.md)): the command pump and frame router behind a `Hub` interface, tested against an in-memory hub, a reference bus, the real Lua bus output, and the real hub SQL on PostgreSQL (including exactly-once delivery across a companion restart). The Supabase client (`SupabaseHub`) is in, checked against the migrations. A virtual bot (`dufleet sim`, the real Lua bus in its fake ArchHUD) runs the whole chain without the game. CI tests it end to end on PostgreSQL. Still to come: config, `run`, `install` and `doctor`.
+- Done 2026-09-27 ([companion/README.md](../companion/README.md)): the command pump and frame router behind a `Hub` interface, tested against an in-memory hub, a reference bus, the real Lua bus output, and the real hub SQL on PostgreSQL (including exactly-once delivery across a companion restart). The Supabase client (`SupabaseHub`) is in, checked against the migrations. A virtual bot (`dufleet sim`, the real Lua bus in its fake ArchHUD) runs the whole chain without the game. CI tests it end to end on PostgreSQL. `dufleet install` and `dufleet doctor` put the bus, ArchHUD and the atlas into the game folder and check them by SHA-256. Still to come: config and `run`.
 
 Transport adapters *(ADR-0001)*:
 - Out: `ingest/log_tailer` (a `<record>` splitter with `stat()` polling) or `ingest/optical` with a `calibrate` command.
@@ -303,7 +303,7 @@ Answered: the server is The Third Verse, which uses its own atlas (The-Third-Ver
 1. **You:** get the admin's written permission (S9).
 2. **You:** run the probe kit, following [spikes/README.md](../spikes/README.md). It covers S8, A1, A2, S0, S11, S1, S3, S4 and S10 in one session. At the end, paste back `results/summary.md` and the panel's lines. If there is time, optional step 12 tries the real bus by hand.
 3. **You:** decide where the hub runs (open question 1). A new Supabase project of its own is the simplest choice.
-4. **Claude:** write ADR-0001 from the results, then build the chosen transports and the companion's `run`, `install` and `doctor` on top of what exists.
+4. **Claude:** write ADR-0001 from the results, then build the chosen transports and the companion's `run` on top of what exists.
 5. **You, after A1:** try `goto` by hand with optional step 12 of the probe kit: a short hop on the same planet, then `cancel` mid-flight.
 
 State on 2026-09-27: the transport-independent parts of workstreams 1–6 are built and green in CI:

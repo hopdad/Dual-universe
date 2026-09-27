@@ -9,12 +9,10 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
-import os
 import shutil
 from collections.abc import Awaitable, Callable
-from pathlib import Path
 
-REPO = Path(os.environ.get("DUFLEET_REPO", Path(__file__).resolve().parents[3]))
+from dufleet import REPO
 
 OnLine = Callable[[str], Awaitable[None]]
 

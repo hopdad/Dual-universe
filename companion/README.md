@@ -9,6 +9,8 @@ The Python process that runs beside each game client. It moves commands from the
 | `dufleet.pump` | `CommandPump`, described below |
 | `dufleet.supabase_hub` | `SupabaseHub`: the `Hub` on a Supabase project through supabase-py, signed in as the device user. `watch_commands` wakes the pump on realtime inserts |
 | `dufleet.router` | `FrameRouter`: checks every frame body against the protocol's JSON Schemas, then passes A and N to the pump, sends H to `sync_epoch` and `bot_report`, writes T to `bot_state` (1 Hz) and `telemetry` (every 5 s), E and D as events, and hands R to the pump |
+| `dufleet.gamefiles` | The game's Lua folder: finding it, installing the bus, ArchHUD and the atlas, and checking them by SHA-256 |
+| `dufleet.pins` | The pinned ArchHUD and atlas files, the same as the probe kit's |
 
 `CommandPump`:
 - recovers the in-flight command after a restart;
@@ -21,9 +23,19 @@ The Python process that runs beside each game client. It moves commands from the
 - `dufleet cmd VERB [ARGS...]` prints a `/b` line with its CRC, for trying the bus by hand. It keeps a cseq counter in `~/.dufleet/`.
 - `dufleet decode [FILE] [--xml]` turns copied chat lines, or the client's XML log, back into JSON messages.
 - `dufleet sim --bot BOT_UUID` runs a virtual bot against a Supabase project: the real Lua bus in its fake ArchHUD (`dufleet.sim.LuaSim`), signed in as the bot's device user. Set `DUFLEET_SUPABASE_URL`, `DUFLEET_SUPABASE_KEY`, `DUFLEET_DEVICE_EMAIL` and `DUFLEET_DEVICE_PASSWORD`. Then queue `ping` on the dashboard and watch it come back.
+- `dufleet install` puts the bus from `lua/` into the game's Lua folder. With `--archhud fetch` and `--atlas fetch` it also puts in ArchHUD 2.105 and The Third Verse's atlas, checked against their pinned SHA-256; a folder or zip works instead of `fetch`.
+  - It is a dry run until you add `--apply`.
+  - It backs up every file it replaces or removes under `autoconf/custom/_dufleet_backup/<time>/`. That includes a `userclass.lua` of your own and the probe kit's files.
+  - It ends by running `doctor`.
+- `dufleet doctor` checks the game folder:
+  - ArchHUD and the atlas against their pins;
+  - `userclass.lua` is the bus shim;
+  - every bus module matches `lua/`.
+
+  It exits 1 if a check fails, and `--json` prints the checks as JSON. Set `DUFLEET_GAME_DIR` (the `Game` folder) or pass `--lua-dir` if the game is not under `C:\ProgramData\My Dual Universe` (spike S8 confirms the path).
 
 Not here yet:
-- configuration and the service commands (`run`, `install`, `doctor`);
+- configuration and the service command (`run`);
 - the transports, which wait for ADR-0001.
 
 The probe kit in `spikes/host` already has the log tail, the optical decoder and the inbox writer as spike code.
