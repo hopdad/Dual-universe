@@ -269,10 +269,13 @@ Line numbers below refer to commit 6c95222, The-Third-Verse/ArchHUD master.
 | Globals the bus can use: `ATLAS`, `AP`, `AtlasOrdered`, `AutopilotTargetIndex`, `CustomTarget` (with `planetname`, `"Space"` off planets), `apRoute`, `BrakeIsOn`, `galaxyReference` and `sys`. `atlas` and the last-toggle time `apDoubleClick` are locals, so a pilot's toggle just before the bus's cannot be seen | `baseclass.lua:520-552`; `apclass.lua:16`; `globals.lua` |
 | `galaxyReference[systemId][bodyId]` is the body with `center` (vec3) and `radius`. `::pos` converts to `center + (radius + alt) * (cos lat cos lon, cos lat sin lon, sin lat)`; body 0 means lat, lon and alt are world x, y and z | `atlasclass.lua:211-223,407-420`; `controlclass.lua:598-618` |
 | A target counts as `"Space"` when it is farther from the closest body's center than its radius plus atmosphere thickness. On an airless moon that is anything above sea level | `atlasclass.lua:695-701` |
+| `galaxyReference` cannot parse a `::pos` string: `mkMapPosition` calls a global `stringmatch` that ArchHUD only declares as a local. Its chat handler has its own converter, and the bus converts positions itself | `atlasclass.lua:131`; `baseclass.lua:15`; `controlclass.lua:598-618` |
 | Two `ToggleAutopilot` calls within 1.5 s in atmosphere count as a double click (orbital hop altitude) | `apclass.lua:498` |
 | `AP.clearAll()` clears every mode but leaves `BrakeIsOn`. `AP.BrakeToggle()` toggles, so it releases a set brake. `BrakeIsOn` can hold a string (`"BL Complete"`, `"Space Arrival"`, `"AP Finalizing"`), which counts as set | `apclass.lua:262-292,824-843` |
 | How trips end: a landing clears `BrakeLanding` and `AltitudeHold` and sets `BrakeIsOn = "BL Complete"`; a space arrival (under 50 m/s at the target) clears `Autopilot` and sets `BrakeIsOn = "Space Arrival"`. `TurnBurn` is a braking preference that can stay set after the autopilot ends | `apclass.lua:2075-2085,2683-2692`; `controlclass.lua:188` |
 | Other callable autopilot functions: `BrakeToggle`, `ResetAutopilots`, `ToggleAltitudeHold`, `ToggleIntoOrbit`, `BeginReentry`, `ToggleVerticalTakeoff`, `routeWP`, `cmdThrottle`, `cmdCruise` | `apclass.lua` |
+
+`lua/spec/archhud_contract_spec.lua` checks the adapter's calls against this code. It loads the real `atlasclass.lua`, `apclass.lua` and `globals.lua` at the pinned commit, with the server's atlas, in a stubbed game. It confirms the target selection, the route precedence, the orbital hop on a quick second toggle, and the stop. It also confirms that engaging from the ground starts an auto takeoff that holds the brake (`BrakeIsOn = "ATO Hold"`).
 
 Not verified here, moved to spikes:
 - The modular ArchHUD 2.105 build installs and flies on the target server (A1).

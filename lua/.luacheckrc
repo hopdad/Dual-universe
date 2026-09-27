@@ -20,3 +20,10 @@ files["spec"] = {
 files["tools/simulate.lua"] = {
     read_globals = { "userBase" },
 }
+
+-- Builds ArchHUD's global environment for its real classes, which dofile defines.
+files["spec/helpers/real_archhud.lua"] = {
+    allow_defined = true,
+    ignore = { "131" }, -- globals only ArchHUD's code reads
+    read_globals = { "PlanetRef", "Kinematics", "Keplers", "AtlasClass", "APClass", "globalDeclare" },
+}

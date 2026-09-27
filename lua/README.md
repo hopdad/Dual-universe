@@ -31,12 +31,14 @@ Needs Lua 5.3, [busted](https://lunarmodules.github.io/busted/), luacheck and dk
 
 ```sh
 cd lua
-./tools/deps.sh      # du-mocks, pinned, into .deps/
+./tools/deps.sh      # du-mocks, ArchHUD and the atlas, pinned, into .deps/
 busted               # specs in spec/, including every case in packages/protocol/vectors.json
 luacheck .
 ```
 
 The specs run the bus in a fake ArchHUD (`spec/helpers/fake_archhud.lua`). It uses du-mocks for the control unit, core and databank, and small fakes where du-mocks leaves a call unimplemented. Its atlas and autopilot copy what the pinned ArchHUD source does for the calls `goto` makes, including selecting the location that sorts first and the orbital hop on a quick second toggle. On each tick it flies the ship toward the target, so jobs finish in the simulator too.
+
+`spec/archhud_contract_spec.lua` runs the adapter against ArchHUD's real atlas and autopilot code instead (`spec/helpers/real_archhud.lua`). `tools/deps.sh` fetches The-Third-Verse/ArchHUD (GPL-3.0) and The-Third-Verse/AtlasFile into `.deps/` at the commits pinned in `companion/src/dufleet/pins.py`; nothing of theirs is committed here. Without them the contract spec is pending.
 
 `tools/simulate.lua` runs the same setup from a script on stdin. `companion/tests/test_lua_bus.py` pipes its output through the Python deframer and the JSON Schemas, which checks the two sides against each other end to end.
 

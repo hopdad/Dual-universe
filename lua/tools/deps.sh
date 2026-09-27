@@ -1,20 +1,27 @@
 #!/usr/bin/env sh
-# Fetches the Lua test dependencies into lua/.deps (gitignored):
-#   du-mocks (1337joe/du-mocks), pinned below.
+# Fetches the Lua test dependencies into lua/.deps (gitignored), each at a pinned commit:
+#   du-mocks (1337joe/du-mocks): mocks of the game's elements;
+#   ArchHUD (The-Third-Verse/ArchHUD, GPL-3.0) and AtlasFile (The-Third-Verse/AtlasFile): the
+#   real atlas and autopilot code that spec/archhud_contract_spec.lua runs the adapter against.
+#   The commits match companion/src/dufleet/pins.py.
 # busted, luacheck and dkjson come from the system or luarocks (see lua/README.md).
 set -eu
 
-DU_MOCKS_URL=https://github.com/1337joe/du-mocks
-DU_MOCKS_REV=a510c77c7239c6162c560de95252b25fa78b3671
-
 here=$(cd "$(dirname "$0")/.." && pwd)
-dest="$here/.deps/du-mocks"
-
-if [ -d "$dest/.git" ] && [ "$(git -C "$dest" rev-parse HEAD)" = "$DU_MOCKS_REV" ]; then
-    exit 0
-fi
-rm -rf "$dest"
 mkdir -p "$here/.deps"
-git clone --quiet "$DU_MOCKS_URL" "$dest"
-git -C "$dest" -c advice.detachedHead=false checkout --quiet "$DU_MOCKS_REV"
-echo "du-mocks $DU_MOCKS_REV in $dest"
+
+fetch() { # name url commit
+    dest="$here/.deps/$1"
+    if [ -d "$dest/.git" ] && [ "$(git -C "$dest" rev-parse HEAD)" = "$3" ]; then
+        return 0
+    fi
+    rm -rf "$dest"
+    git init --quiet "$dest"
+    git -C "$dest" fetch --quiet --depth 1 "$2" "$3"
+    git -C "$dest" -c advice.detachedHead=false checkout --quiet FETCH_HEAD
+    echo "$1 $3 in $dest"
+}
+
+fetch du-mocks https://github.com/1337joe/du-mocks a510c77c7239c6162c560de95252b25fa78b3671
+fetch archhud https://github.com/The-Third-Verse/ArchHUD 6c952221d9c82797b282161d9ae94744d3f8c9cf
+fetch atlasfile https://github.com/The-Third-Verse/AtlasFile 48dd00f910782e9707af923264b387bd2a4357ee

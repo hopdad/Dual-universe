@@ -49,6 +49,12 @@ def test_the_pins_agree_with_the_probe_kit():
         assert getattr(pins, name) == getattr(probe, name), name
 
 
+def test_the_lua_contract_tests_fetch_the_pinned_commits():
+    deps = (ROOT / "lua" / "tools" / "deps.sh").read_text(encoding="utf-8")
+    assert f"https://github.com/{pins.ARCHHUD_REPO} {pins.ARCHHUD_COMMIT}" in deps
+    assert f"https://github.com/{pins.ATLAS_REPO} {pins.ATLAS_COMMIT}" in deps
+
+
 def test_the_game_folder_is_found_under_programdata(tmp_path, monkeypatch):
     lua = tmp_path / "My Dual Universe" / "Game" / "data" / "lua"
     lua.mkdir(parents=True)

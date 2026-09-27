@@ -60,7 +60,8 @@ Game files:
   - Plain Lua 5.3 modules for dufleet/ plus the userclass.lua shim; no DU-LuaC project.
   - All ArchHUD access goes through dufleet/archhud_adapter. Every entry point runs in pcall.
   - Timers only; no bot work in onUpdate/onFlush.
-  - Tests: busted + du-mocks + a fake-ArchHUD harness; luacheck.
+  - Tests: busted + du-mocks + a fake-ArchHUD harness, plus a contract spec against the real pinned ArchHUD
+    code (tools/deps.sh fetches it); luacheck.
 - companion/:
   - Python 3.12, uv, pydantic, asyncio, pytest; supabase-py async client (realtime on_postgres_changes with filter).
   - Win32 code isolated in proc/ and inject/; all input goes through inject/focus.py (verify the foreground HWND

@@ -285,7 +285,7 @@ Acceptance, unchanged from the handoff:
 | No log channel (likely) | Transport O, drawn through `userScreen` |
 | No file inbox (S11 fails) | Chat keystrokes (Transport C), with focus checks after every send |
 | Policy: NQ removed log output specifically to stop bots, and you are a player, not the admin | Written permission from the admin (S9) before any bot runs unattended |
-| ArchHUD is dormant upstream, and the fork has one maintainer | Pin the commit; keep every ArchHUD call in `archhud_adapter`; run contract tests against the fake-ArchHUD harness; carry our own patches if needed (GPL-3.0 allows it) |
+| ArchHUD is dormant upstream, and the fork has one maintainer | Pin the commit; keep every ArchHUD call in `archhud_adapter`; run contract tests against the real ArchHUD code at the pinned commit (`lua/spec/archhud_contract_spec.lua`); carry our own patches if needed (GPL-3.0 allows it) |
 | ArchHUD plus the bus exceed the CPU quota | Timer-driven bus, round-robin collectors, the S10 soak; lower ArchHUD's HUD tick if needed |
 | Focus contention during UI tasks | One client per VM, one input mutex, verification after every send |
 | Client updates | Fixtures, plus `dufleet doctor` at startup |
