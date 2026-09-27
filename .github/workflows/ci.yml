@@ -34,7 +34,8 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v7
-      - uses: astral-sh/setup-uv@v10
+      - name: Install uv
+        run: pipx install uv
       - name: Install Lua 5.3 for the cross-language tests
         run: |
           sudo apt-get update
