@@ -4,3 +4,8 @@ docs/verification/luac/*/out/
 docs/verification/luac/*/util/
 docs/verification/luac/*/emmy.config.json
 docs/verification/luac/*/.gitignore
+# Probe kit: local results, Python environment and caches
+spikes/results/
+spikes/host/.venv/
+__pycache__/
+.pytest_cache/

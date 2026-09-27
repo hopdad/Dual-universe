@@ -32,6 +32,8 @@ ArchHUD (The-Third-Verse/ArchHUD 2.105, modular master build, commit 6c95222, GP
 same commit):
 - Installed as local files under Game/data/lua/autoconf/custom/ (ArchHUD.conf plus archhud/). No paste-size limit applies.
 - The BetaStandalone branch is a single-file build with no userclass hook. Never use it for bots.
+- The server is The Third Verse. Its atlas (The-Third-Verse/AtlasFile at 48dd00f) goes to autoconf/custom/atlas.lua,
+  where ArchHUD 2.105 loads it by default (customAtlas = "atlas").
 - archhud/userclass.lua is loaded last. userBase.ExtraOnStart/Stop/Update/Flush run at the end of each event;
   userX.fn replaces a class function by name.
 - The global userScreen is added to ArchHUD's setScreen content. Nothing else may call system.setScreen on that unit.
@@ -79,6 +81,9 @@ Game files:
 
 ## Current phase: 0, with transport-independent Phase 1 work in parallel
 - Spikes to run first: S9, S8, A1, A2, S11, S0, S1.
+- The probe kit is in spikes/, with the session script in spikes/README.md. Its tests run offline:
+  cd spikes/host && uv run pytest (needs lua5.3 on PATH).
+- Pinned upstream files and their SHA-256 live in spikes/host/src/dufleet_probe/pins.py.
 - Transport adapters wait for ADR-0001. The protocol package, the hub schema, the dashboard skeleton and the Lua
   and companion cores do not.
 

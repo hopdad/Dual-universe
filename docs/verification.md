@@ -271,3 +271,9 @@ Not verified here, moved to spikes:
 - The `userclass` shim can wrap chat and timers as described (A2).
 - The myDU client's install path for local Lua files (S8).
 - Instruction headroom with the bus inside ArchHUD's unit (S10).
+
+The server's atlas, checked when the probe kit was built:
+
+| Repository | Commit | Date | Note |
+|---|---|---|---|
+| The-Third-Verse/AtlasFile | 48dd00f | 2025-09-12 | One `atlas.lua` (72 KB, Novaquark's atlas format, no licence file). Its README tells players to put it in `autoconf/custom/` and load it with `package.preload['atlas']`, so the `package` table is reachable from DU Lua. ArchHUD 2.105 loads `autoconf/custom/atlas.lua` by default, so no setting needs changing |

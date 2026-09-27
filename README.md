@@ -11,6 +11,7 @@ A bot fleet for myDU (self-hosted Dual Universe). It has five parts:
 Status: Phase 0 (spikes and decision gates). No application code yet. Client-only, flying with ArchHUD.
 
 - [Development plan](docs/plan.md) and [decision records](docs/adr/)
+- [Phase 0 probe kit](spikes/README.md): the in-game session that answers the open spikes
 - [Handoff verification](docs/verification.md) and its [reproducible checks](docs/verification/)
 - [Original handoff spec](docs/handoff/original-handoff.md)
 - [CLAUDE.md](CLAUDE.md), working rules for Claude Code in this repository

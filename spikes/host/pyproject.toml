@@ -1,0 +1,36 @@
+[project]
+name = "dufleet-probe"
+version = "0.1.0"
+description = "Host scripts for the mydu-fleet Phase 0 probe kit"
+requires-python = ">=3.10"
+dependencies = [
+    "mss>=9",
+    "numpy>=1.26",
+    "pillow>=10",
+    "psutil>=5.9",
+]
+
+[project.scripts]
+dufleet-probe = "dufleet_probe.cli:main"
+
+[dependency-groups]
+dev = ["pytest>=8"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/dufleet_probe"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 120
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "B", "I"]
+
+[tool.ruff.lint.per-file-ignores]
+"src/dufleet_probe/pins.py" = ["E501"]  # one pinned file per line

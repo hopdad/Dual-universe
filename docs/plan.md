@@ -60,6 +60,7 @@ Files on each bot host, all under the client's `Game/data/lua/autoconf/custom/`.
 | Path | Owner |
 |---|---|
 | `ArchHUD.conf`, `archhud/` | The-Third-Verse/ArchHUD 2.105, modular master build, pinned to commit `6c95222`, unmodified |
+| `atlas.lua` | The Third Verse's atlas (The-Third-Verse/AtlasFile, commit `48dd00f`). ArchHUD 2.105 loads it by default (`customAtlas = "atlas"`) |
 | `archhud/userclass.lua` | Ours: a short shim that loads the bus |
 | `dufleet/` | Ours: the bot bus |
 | `dufleet/inbox.lua` | Written by the companion, only with Transport F |
@@ -74,7 +75,7 @@ You run the in-game part. Claude prepares the probes under `spikes/` (a probe `u
 | S8 | Where does the myDU client keep `Game/data/lua` and its logs? Is EQU8 present? Can login be automated? CPU, RAM and GPU per client; FPS cap vs timer resolution | install, watchdog, sizing |
 | A1 | Does the modular ArchHUD 2.105 build (The-Third-Verse master, not `BetaStandalone`) install from local files and fly on the target server? Check a pilot seat and a remote controller, a custom atlas if the server needs one, and an autopilot trip to a pasted `::pos` on the same planet and on another planet | D1 |
 | A2 | Does the probe `userclass.lua` work? `ExtraOnStart` fires; the wrapped `PROGRAM.controlInput` sees `/b` lines before ArchHUD; a `dub` timer ticks through the wrapped `PROGRAM.onTick`; `userScreen` content shows | D1 |
-| S11 | Are `package`, `package.loaded`, `load`, `loadfile` or `dofile` reachable? Does a re-`require` pick up a file the companion changed at runtime? How fast, and at what instruction cost? | D3 |
+| S11 | Are `package`, `package.loaded`, `load`, `loadfile` or `dofile` reachable? Does a re-`require` pick up a file the companion changed at runtime? How fast, and at what instruction cost? Prior: The Third Verse's AtlasFile README tells players to set `package.preload`, so the `package` table is reachable | D3 |
 | S0 | Does `system.print` reach the disk log? Latency, maximum line length, escaping, file naming and rotation. Confirm `io` and `os` are absent. Prior: probably not | D2 |
 | S1 | Is the 48×24 optical grid, drawn through `userScreen`, legible at the pinned resolution and HUD scale, and clear of ArchHUD's own elements? Decode error rate, instruction cost. If the HUD overlay is unreliable, the fallback is a screen unit; ArchHUD's `content/test-pattern*.svg` measure a screen's pixel accuracy | D2 |
 | S3 | Chat open key, tab persistence, input length limit, behaviour with menus open. Needed for login and UI work even if S11 passes | injector |
@@ -283,16 +284,14 @@ Acceptance, unchanged from the handoff:
 
 ## Open questions for you
 
-1. Which myDU server will the bots run on (The Third Verse?), and does it use a custom atlas (changed planets)? This sets ArchHUD's `customAtlas` and the dashboard map.
-2. Supabase: a new hosted project, an existing one, or self-hosted?
-3. Fleet size and hosts: spare PCs, Hyper-V GPU-P VMs, or cloud instances?
-4. The `Ai helper/` folder: keep it, remove it, or give it a purpose?
+Answered: the server is The Third Verse, which uses its own atlas (The-Third-Verse/AtlasFile). The dashboard map will read the same file.
+
+1. Supabase: a new hosted project, an existing one, or self-hosted?
+2. Fleet size and hosts: spare PCs, Hyper-V GPU-P VMs, or cloud instances?
+3. The `Ai helper/` folder: keep it, remove it, or give it a purpose?
 
 ## Next steps
 
-1. **You:** ask the server admin for written permission (S9), and answer question 1.
-2. **Claude:** build the Phase 0 kit in `spikes/`:
-   - a probe `userclass.lua` covering A2, S11, S0 and S1, all in one in-game session;
-   - host scripts for the log grep, the inbox write, dxcam capture and a SendInput test.
-3. **You:** install the modular ArchHUD 2.105 from The-Third-Verse/ArchHUD on one ship, run A1 and the probes, and paste the results.
-4. **Claude:** write ADR-0001. In parallel, start Phase 1 workstreams 1–3 and the transport-independent parts of 4–6.
+1. **You:** get the admin's written permission (S9).
+2. **You:** run the probe kit, following [spikes/README.md](../spikes/README.md). It covers S8, A1, A2, S0, S11, S1, S3, S4 and S10 in one session. At the end, paste back `results/summary.md` and the panel's lines.
+3. **Claude:** write ADR-0001 from the results. In parallel, start Phase 1 workstreams 1–3 and the transport-independent parts of 4–6.
