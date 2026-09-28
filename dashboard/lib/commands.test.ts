@@ -4,11 +4,17 @@ import { test } from "node:test";
 import { COMPOSER_VERBS, isComposerVerb, isUuid } from "./commands.ts";
 import { VERBS } from "./protocol.ts";
 
-test("composer verbs exist in the protocol and take no arguments", () => {
+test("composer verbs exist in the protocol and need no arguments", () => {
   for (const verb of COMPOSER_VERBS) {
     assert.ok(verb in VERBS, verb);
-    assert.equal(VERBS[verb].args.length, 0, verb);
+    const args: readonly { optional?: boolean }[] = VERBS[verb].args;
+    assert.ok(args.every((a) => a.optional === true), verb);
   }
+});
+
+test("nothing that sets a ship moving can be queued", () => {
+  for (const verb of ["run", "resume", "relay", "db"]) assert.equal(isComposerVerb(verb), false, verb);
+  assert.equal(isComposerVerb("cancel"), true);
 });
 
 test("only composer verbs pass", () => {

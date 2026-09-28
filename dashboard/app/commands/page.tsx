@@ -3,7 +3,7 @@ import Link from "next/link";
 import { Ago } from "@/components/ago";
 import { AutoRefresh } from "@/components/auto-refresh";
 import { CommandStatusBadge } from "@/components/badges";
-import { COMPOSER_VERBS } from "@/lib/commands";
+import { COMPOSER_LABELS, COMPOSER_VERBS } from "@/lib/commands";
 import { createClient } from "@/lib/supabase/server";
 import type { Command } from "@/lib/types";
 
@@ -39,7 +39,7 @@ export default async function CommandsPage(props: PageProps<"/commands">) {
         <label className="flex flex-col gap-1">
           <span className="text-xs text-zinc-500">Command</span>
           <select name="verb" className="rounded border border-zinc-300 bg-white px-2 py-1 dark:border-zinc-700 dark:bg-zinc-900">
-            {COMPOSER_VERBS.map((v) => <option key={v} value={v}>{v}</option>)}
+            {COMPOSER_VERBS.map((v) => <option key={v} value={v}>{COMPOSER_LABELS[v]}</option>)}
           </select>
         </label>
         <button type="submit" className="rounded bg-zinc-900 px-3 py-1 text-white dark:bg-zinc-100 dark:text-zinc-900">Queue</button>

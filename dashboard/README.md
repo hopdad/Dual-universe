@@ -32,7 +32,14 @@ npm run build                                      # NEXT_PUBLIC_* values are ba
 npm run e2e                                        # Playwright smoke tests on the build
 ```
 
-The smoke tests need no Supabase project. They build against an unreachable URL and check the signed-out paths:
+The smoke tests need no Supabase project. Build against an unreachable URL first, as CI does:
+
+```sh
+NEXT_PUBLIC_SUPABASE_URL=http://127.0.0.1:54321 NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=sb_publishable_ci npm run build
+npm run e2e
+```
+
+A build without these values fails every request, so Playwright times out waiting for the server. The tests check the signed-out paths:
 - redirects to `/login`;
 - a broken sign-in link;
 - a hub that cannot be reached.
