@@ -8,7 +8,7 @@ Everything under `autoconf/custom/` is copied into the game client's `Game/data/
 |---|---|
 | `archhud/userclass.lua` | Shim: ArchHUD loads it last; it starts and stops the bus |
 | `dufleet/bus.lua` | Wires the modules: hooks, timer, H and T, draining the outbox |
-| `dufleet/archhud_adapter.lua` | The only module that touches ArchHUD: `PROGRAM` hooks, `dbHud_1`, autopilot flags, target selection, toggle and stop, `userScreen` |
+| `dufleet/archhud_adapter.lua` | The only module that touches ArchHUD: `PROGRAM` hooks, `dbHud_1`, autopilot flags, fuel tanks, target selection, toggle and stop, `userScreen` |
 | `dufleet/game.lua` | The game API calls the bus makes (`system`, `unit`, `construct`, `core`) |
 | `dufleet/dispatcher.lua` | Command queue: parse, dedupe, handler, persist, reply |
 | `dufleet/builtins.lua` | Handlers for every verb. The job verbs go to the runtime; relay (Phase 3) refuses with `E_STATE` for now |
