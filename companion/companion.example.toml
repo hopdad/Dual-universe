@@ -1,0 +1,22 @@
+# Settings for `dufleet run --config companion.toml` (see src/dufleet/config.py).
+# The device user's password is read from DUFLEET_DEVICE_PASSWORD, never from this file.
+
+[hub]
+url = "https://your-project.supabase.co"
+publishable_key = "sb_publishable_replace_me"
+email = "hauler-1@devices.example"
+
+[bot]
+id = "00000000-0000-0000-0000-000000000000"
+
+[transport]
+kind = "sim"
+
+[pump]
+lease_s = 60
+poll_s = 2.0
+idle_s = 10.0
+lost_s = 30.0
+
+[game]
+# lua_dir = 'C:\ProgramData\My Dual Universe\Game\data\lua'

@@ -7,10 +7,14 @@
         Decodes @@DUB lines from text pasted on stdin or a file into one JSON message per
         line. --xml reads the client's XML log: the <message> of each <record>, unescaped.
 
+    dufleet run [--config PATH]
+        The companion for one bot: the hub, the pump and the router over the configured
+        transport (dufleet/config.py describes the file; default ~/.dufleet/companion.toml).
     dufleet sim --bot BOT_UUID
-        Runs a virtual bot: the real Lua bus in a fake ArchHUD (lua/tools/simulate.lua),
-        wired to the hub as the bot's device user. Set DUFLEET_SUPABASE_URL,
-        DUFLEET_SUPABASE_KEY (publishable), DUFLEET_DEVICE_EMAIL and DUFLEET_DEVICE_PASSWORD.
+        `run` with the simulator as the transport: the real Lua bus in a fake ArchHUD
+        (lua/tools/simulate.lua), configured from the environment instead of a file.
+        Set DUFLEET_SUPABASE_URL, DUFLEET_SUPABASE_KEY (publishable), DUFLEET_DEVICE_EMAIL
+        and DUFLEET_DEVICE_PASSWORD.
 
     dufleet install [--archhud fetch|FOLDER|ZIP] [--atlas fetch|FILE] [--apply]
         Puts the bus (from lua/), and optionally ArchHUD and the atlas at their pinned
@@ -20,7 +24,7 @@
         Checks the game folder: ArchHUD and the atlas against their pins, the bus against
         lua/. Exits 1 if a check fails.
 
-The service for real clients (the transports and `run`) comes with ADR-0001.
+The transports for real clients come with ADR-0001.
 """
 
 from __future__ import annotations
@@ -36,7 +40,7 @@ import sys
 from dataclasses import asdict
 from pathlib import Path
 
-from dufleet import __version__, gamefiles
+from dufleet import __version__, config, gamefiles
 from dufleet.protocol import CommandError, Deframer, build_command
 from dufleet.router import VALIDATORS
 
@@ -87,38 +91,47 @@ def decode(args: argparse.Namespace) -> int:
     return 0
 
 
-async def _sim(bot: str) -> None:
-    from dufleet.pump import CommandPump
-    from dufleet.router import FrameRouter
-    from dufleet.sim import LuaSim
-    from dufleet.supabase_hub import SupabaseHub
+def _serve(cfg: config.Config) -> int:
+    from dufleet.service import serve
 
-    names = ("SUPABASE_URL", "SUPABASE_KEY", "DEVICE_EMAIL", "DEVICE_PASSWORD")
-    env = {k: os.environ.get(f"DUFLEET_{k}") for k in names}
-    missing = [f"DUFLEET_{k}" for k, v in env.items() if not v]
-    if missing:
-        raise SystemExit("set " + ", ".join(missing))
-    hub = await SupabaseHub.connect(env["SUPABASE_URL"], env["SUPABASE_KEY"], env["DEVICE_EMAIL"],
-                                    env["DEVICE_PASSWORD"])
-    sim = LuaSim()
-    pump = CommandPump(hub, bot, sim.send, transport="C")
-    sim.on_line = FrameRouter(hub, bot, pump).feed
-    await sim.start()
-    await hub.watch_commands(bot, pump.wake)
-    print(f"virtual bot running for {bot}; Ctrl+C stops it", file=sys.stderr)
+    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
     try:
-        await pump.run()
-    finally:
-        await sim.close()
+        asyncio.run(serve(cfg))
+    except KeyboardInterrupt:
+        pass
+    except config.ConfigError as exc:
+        print(exc, file=sys.stderr)
+        return 2
+    return 0
+
+
+def run(args: argparse.Namespace) -> int:
+    try:
+        cfg = config.load(args.config)
+    except config.ConfigError as exc:
+        print(exc, file=sys.stderr)
+        return 2
+    return _serve(cfg)
 
 
 def sim(args: argparse.Namespace) -> int:
-    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
+    names = ("SUPABASE_URL", "SUPABASE_KEY", "DEVICE_EMAIL", "DEVICE_PASSWORD")
+    missing = [f"DUFLEET_{k}" for k in names if not os.environ.get(f"DUFLEET_{k}")]
+    if missing:
+        print("set " + ", ".join(missing), file=sys.stderr)
+        return 2
     try:
-        asyncio.run(_sim(args.bot))
-    except KeyboardInterrupt:
-        pass
-    return 0
+        cfg = config.parse({
+            "hub": {"url": os.environ["DUFLEET_SUPABASE_URL"], "publishable_key": os.environ["DUFLEET_SUPABASE_KEY"],
+                    "email": os.environ["DUFLEET_DEVICE_EMAIL"], "password_env": "DUFLEET_DEVICE_PASSWORD"},
+            "bot": {"id": args.bot},
+            "transport": {"kind": "sim"},
+        })
+    except config.ConfigError as exc:
+        print(exc, file=sys.stderr)
+        return 2
+    print(f"virtual bot running for {args.bot}; Ctrl+C stops it", file=sys.stderr)
+    return _serve(cfg)
 
 
 def _warn(message: str) -> None:
@@ -192,6 +205,10 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("file", nargs="?", type=Path, help="default: stdin")
     p.add_argument("--xml", action="store_true", help="unescape XML entities (the client's log file)")
     p.set_defaults(func=decode)
+
+    p = sub.add_parser("run", help="run the companion for one bot (hub, pump and router over the transport)")
+    p.add_argument("--config", type=Path, default=config.DEFAULT_PATH, help=f"default {config.DEFAULT_PATH}")
+    p.set_defaults(func=run)
 
     p = sub.add_parser("sim", help="run a virtual bot (the real Lua bus without the game) against the hub")
     p.add_argument("--bot", required=True, help="the bot's id (uuid) in the hub")

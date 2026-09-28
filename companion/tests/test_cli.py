@@ -41,3 +41,22 @@ def test_decode_reads_pasted_chat(capsys, monkeypatch):
     assert main(["decode"]) == 0
     (msg,) = [json.loads(line) for line in capsys.readouterr().out.splitlines()]
     assert msg["kind"] == "H" and "valid" not in msg
+
+
+def test_sim_says_which_settings_are_missing(monkeypatch, capsys):
+    for name in ("SUPABASE_URL", "SUPABASE_KEY", "DEVICE_EMAIL", "DEVICE_PASSWORD"):
+        monkeypatch.delenv(f"DUFLEET_{name}", raising=False)
+    assert main(["sim", "--bot", "11111111-2222-3333-4444-555555555555"]) == 2
+    assert "DUFLEET_SUPABASE_URL" in capsys.readouterr().err
+    for name, value in (("SUPABASE_URL", "https://x.supabase.co"), ("SUPABASE_KEY", "k"),
+                        ("DEVICE_EMAIL", "d@x"), ("DEVICE_PASSWORD", "p")):
+        monkeypatch.setenv(f"DUFLEET_{name}", value)
+    assert main(["sim", "--bot", "hauler-1"]) == 2
+    assert "bot.id" in capsys.readouterr().err
+
+
+def test_run_reports_a_bad_config(tmp_path, capsys):
+    path = tmp_path / "companion.toml"
+    path.write_text("[hub]\nurl = 'https://x.supabase.co'\n", encoding="utf-8")
+    assert main(["run", "--config", str(path)]) == 2
+    assert "hub.publishable_key" in capsys.readouterr().err
