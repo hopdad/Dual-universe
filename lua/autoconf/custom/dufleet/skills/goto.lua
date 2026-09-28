@@ -22,12 +22,16 @@
 -- (10% by default): atmo fuel while in atmosphere, space fuel in space or for a target on
 -- another body or in deep space. Types the ship has no tanks for are not checked.
 
+local P = require("autoconf/custom/dufleet/protocol_gen")
+
 local M = { phase = "engage" }
 
 M.TOL_PLANET, M.TOL_SPACE = 50, 1000
 M.SETTLE_KMH, M.SETTLE_S, M.DISENGAGED_S = 1, 5, 30
 
-local KEYS = { pos = true, tol = true, timeout = true }
+-- Parameter names, required ones, number bounds and defaults, from the skills registry
+-- (packages/protocol/skills.json), which also gives the planner its schema.
+local PARAMS = P.SKILL_PARAMS["goto"]
 
 local function round1(x)
     return math.floor(x * 10 + 0.5) / 10
@@ -77,20 +81,34 @@ local function lowFuel(env, bodyId)
     return nil
 end
 
+-- The number parameters, within their bounds, with defaults filled in; or nil and a message.
+local function numbers(params)
+    local out = {}
+    for name, spec in pairs(PARAMS) do
+        local text = params[name]
+        if text == nil and spec.default ~= nil then text = tostring(spec.default) end
+        if spec.min and text ~= nil then
+            local n, err = number(text, name, spec.min, spec.max)
+            if not n then return nil, err end
+            out[name] = n
+        end
+    end
+    return out
+end
+
 function M.check(params, env)
     for k in pairs(params) do
-        if not KEYS[k] then return nil, "E_ARGS", "unknown parameter " .. k end
+        if not PARAMS[k] then return nil, "E_ARGS", "unknown parameter " .. k end
     end
-    if not params.pos then return nil, "E_ARGS", "missing pos" end
+    for name, spec in pairs(PARAMS) do
+        if spec.required and not params[name] then return nil, "E_ARGS", "missing " .. name end
+    end
     local pos, err = parsePos(params.pos)
     if not pos then return nil, "E_ARGS", err end
-    local tol, timeout
-    if params.tol then
-        tol, err = number(params.tol, "tol", 1, 100000)
-        if not tol then return nil, "E_ARGS", err end
-    end
-    timeout, err = number(params.timeout or "3600", "timeout", 10, 86400)
-    if not timeout then return nil, "E_ARGS", err end
+    local n
+    n, err = numbers(params)
+    if not n then return nil, "E_ARGS", err end
+    local tol, timeout = n.tol, n.timeout
 
     if not env.ah.setupComplete() then return nil, "E_STATE", "ArchHUD is still starting" end
     local busy = env.ah.busy()

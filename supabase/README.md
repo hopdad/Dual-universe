@@ -13,6 +13,8 @@ SQL migrations for the mydu-fleet hub. They replace the handoff's `0001`–`0004
 
 The tables live in `public`, so use a Supabase project of their own (open question 1 in the plan). There is no `config.toml` yet: `supabase init` creates one once the hosting is chosen. Until then, apply the files in order with `supabase db push` or `psql`.
 
+Then apply `seed/skills.sql`, and apply it again whenever `packages/protocol/skills.json` changes. `packages/protocol/codegen.py` generates it. It updates the `skills` rows in place, keeping their success and failure counts, and removes skills the bus no longer has.
+
 ## Who can do what
 
 Everyone signs in; nothing uses the service role.

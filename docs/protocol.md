@@ -7,7 +7,8 @@ Sources of truth, in `packages/protocol/`:
 | File | Role |
 |---|---|
 | `protocol.schema.json` | Constants, kinds, error codes, verbs and argument types (`x-protocol`), and a JSON Schema for every frame body (`$defs`) |
-| `codegen.py` | Writes `lua/autoconf/custom/dufleet/protocol_gen.lua` and `companion/src/dufleet/protocol/generated.py`. `--check` fails in CI if either is stale. Never edit the generated files |
+| `skills.json` | The skills the bus implements: each one's parameters as JSON Schema, pre and postconditions, and examples that the Lua and Python tests both check |
+| `codegen.py` | Writes `lua/autoconf/custom/dufleet/protocol_gen.lua`, `companion/src/dufleet/protocol/generated.py`, `dashboard/lib/protocol.ts` and the hub's skills rows (`supabase/seed/skills.sql`). `--check` fails in CI if any is stale. Never edit the generated files |
 | `tools/make_vectors.py` | Writes `vectors.json` from the Python reference codec (`companion/src/dufleet/protocol/`) |
 | `vectors.json` | The contract. The Lua and Python tests both run against it |
 
@@ -192,7 +193,7 @@ A `run` starts a job. The bus runs one at a time, and the job reports back on it
 
 #### `goto`
 
-Flies to a position with ArchHUD's autopilot, the way a pilot does with a `::pos` waypoint and one autopilot toggle.
+Flies to a position with ArchHUD's autopilot, the way a pilot does with a `::pos` waypoint and one autopilot toggle. Its parameters, bounds and defaults come from `skills.json`, which the hub's `skills` table and the planner share.
 
 ```
 run goto <job> pos=<systemId>,<bodyId>,<lat>,<lon>,<alt> [tol=<m>] [timeout=<s>]

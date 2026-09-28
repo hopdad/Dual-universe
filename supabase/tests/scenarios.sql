@@ -334,4 +334,26 @@ select test.expect_error($q$select public.request_resend('22222222-0000-0000-000
 :as_anon
 select test.expect_error($q$select public.request_resend('22222222-0000-0000-0000-000000000002', 1)$q$, '42501');
 
+\echo 'H19 the skills registry: everyone signed in reads it, nobody writes it, a re-seed keeps the counts'
+:as_device_b
+do $$ begin
+  assert (select version = '1' and args_schema -> 'required' = '["pos"]'
+                 and args_schema -> 'properties' ? 'tol' and jsonb_array_length(preconditions) > 0
+            from public.skills where name = 'goto'), 'goto is registered with its schema';
+  assert (select count(*) from public.skills) = 1, 'only implemented skills';
+end $$;
+select test.expect_error($q$insert into public.skills (name, version, args_schema, description) values ('x', '1', '{}', 'x')$q$, '42501');
+select test.expect_error($q$update public.skills set description = 'x'$q$, '42501');
+:as_anon
+select test.expect_error($q$select count(*) from public.skills$q$, '42501');
+:as_admin
+update public.skills set success_count = 3, description = 'stale' where name = 'goto';
+insert into public.skills (name, version, args_schema, description) values ('patrol', '0', '{}', 'retired');
+\ir ../seed/skills.sql
+do $$ begin
+  assert (select success_count = 3 and description <> 'stale' from public.skills where name = 'goto'),
+    'a re-seed updates the row and keeps its counts';
+  assert not exists (select 1 from public.skills where name = 'patrol'), 'skills not in skills.json go';
+end $$;
+
 \echo 'all hub scenarios passed'

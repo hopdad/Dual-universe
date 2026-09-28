@@ -227,6 +227,7 @@ Transport adapters *(ADR-0001)*:
 
 - Rows in the `skills` table.
 - `/map`, with bodies from the server's atlas (ArchHUD's `customAtlas` file where the server uses one).
+- Done 2026-09-28 for the rows. `packages/protocol/skills.json` is the one source: codegen writes the hub's rows (`supabase/seed/skills.sql`, an upsert that keeps the success and failure counts), the parameter bounds `goto` checks, and the registry for the companion and the dashboard. Its examples are checked against both the schema and the bus. `/map` waits for a live hub.
 
 ### Acceptance
 

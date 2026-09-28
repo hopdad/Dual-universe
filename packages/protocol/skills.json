@@ -1,0 +1,60 @@
+{
+  "$comment": "The skills the bus implements: the hub's skills rows (supabase/seed/skills.sql) and the parameter bounds the bus checks are generated from this by codegen.py. Parameters travel as key=value tokens of a run command; types here describe their values.",
+  "goto": {
+    "version": "1",
+    "description": "Fly to a position with ArchHUD's autopilot and stop there: it lands under the target on a planet, and stops near it in space.",
+    "params": {
+      "pos": {
+        "type": "string",
+        "maxLength": 120,
+        "pattern": "^[0-9]+,[0-9]+,[+-]?[0-9]+(\\.[0-9]+)?([eE][+-]?[0-9]+)?,[+-]?[0-9]+(\\.[0-9]+)?([eE][+-]?[0-9]+)?,[+-]?[0-9]+(\\.[0-9]+)?([eE][+-]?[0-9]+)?$",
+        "description": "systemId,bodyId,lat,lon,alt as in ::pos: degrees and metres above sea level. Body 0 is deep space, with world x,y,z in place of lat,lon,alt"
+      },
+      "tol": {
+        "type": "number",
+        "minimum": 1,
+        "maximum": 100000,
+        "description": "arrival tolerance in metres: horizontal on a planet, straight in space. Default 50 on a planet and 1000 in space"
+      },
+      "timeout": {
+        "type": "number",
+        "minimum": 10,
+        "maximum": 86400,
+        "default": 3600,
+        "description": "seconds of running time, pauses excluded, before the job gives up"
+      }
+    },
+    "required": ["pos"],
+    "preconditions": [
+      "ArchHUD has finished starting",
+      "no ArchHUD travel mode is set and no ArchHUD route is loaded",
+      "the fuel the trip needs is above dub.cfg.minfuel (10%)",
+      "the target body is in ArchHUD's atlas"
+    ],
+    "postconditions": [
+      "done: the ship has stood still for 5 s within tol of the target",
+      "cancelled, timed out, or failed on the way: the autopilot is off, the throttle is 0 and the brake is set"
+    ],
+    "examples": {
+      "$comment": "Checked against args_schema (companion tests) and against the bus's own check (lua/spec).",
+      "valid": [
+        {"pos": "0,2,35.3951,104.1187,285.5413"},
+        {"pos": "0,2,-60,300,1000", "tol": 5},
+        {"pos": "0,0,-123000,98765.5,42", "tol": 100000, "timeout": 10},
+        {"pos": "0,2,1.5e1,-2,0", "timeout": 86400}
+      ],
+      "invalid": [
+        {},
+        {"tol": 50},
+        {"pos": "0,2,1,2"},
+        {"pos": "0,2,1,2,3,4"},
+        {"pos": "0,2,x,2,3"},
+        {"pos": "0,2.5,1,2,3"},
+        {"pos": "0,2,1,2,3", "tol": 0},
+        {"pos": "0,2,1,2,3", "tol": 100001},
+        {"pos": "0,2,1,2,3", "timeout": 9},
+        {"pos": "0,2,1,2,3", "speed": 3}
+      ]
+    }
+  }
+}

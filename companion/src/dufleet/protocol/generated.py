@@ -68,6 +68,38 @@ VERBS = {'cal': {'doc': 'optical calibration pattern on or off (Transport O)',
  'setid': {'doc': 'store the bot id in the databank', 'args': [{'name': 'id', 'type': 'bot'}]},
  'status': {'doc': 'acknowledge, then send H and T', 'args': []}}
 KIND_BODIES = {'A': 'ack', 'D': 'debug', 'E': 'event', 'H': 'hello', 'N': 'nack', 'R': 'result', 'T': 'telemetry'}
+SKILL_REGISTRY = {'goto': {'version': '1',
+          'description': "Fly to a position with ArchHUD's autopilot and stop there: it lands under the "
+                         'target on a planet, and stops near it in space.',
+          'args_schema': {'type': 'object',
+                          'properties': {'pos': {'type': 'string',
+                                                 'maxLength': 120,
+                                                 'pattern': '^[0-9]+,[0-9]+,[+-]?[0-9]+(\\.[0-9]+)?([eE][+-]?[0-9]+)?,[+-]?[0-9]+(\\.[0-9]+)?([eE][+-]?[0-9]+)?,[+-]?[0-9]+(\\.[0-9]+)?([eE][+-]?[0-9]+)?$',
+                                                 'description': 'systemId,bodyId,lat,lon,alt as in ::pos: '
+                                                                'degrees and metres above sea level. Body 0 '
+                                                                'is deep space, with world x,y,z in place of '
+                                                                'lat,lon,alt'},
+                                         'tol': {'type': 'number',
+                                                 'minimum': 1,
+                                                 'maximum': 100000,
+                                                 'description': 'arrival tolerance in metres: horizontal on '
+                                                                'a planet, straight in space. Default 50 on '
+                                                                'a planet and 1000 in space'},
+                                         'timeout': {'type': 'number',
+                                                     'minimum': 10,
+                                                     'maximum': 86400,
+                                                     'default': 3600,
+                                                     'description': 'seconds of running time, pauses '
+                                                                    'excluded, before the job gives up'}},
+                          'required': ['pos'],
+                          'additionalProperties': False},
+          'preconditions': ['ArchHUD has finished starting',
+                            'no ArchHUD travel mode is set and no ArchHUD route is loaded',
+                            'the fuel the trip needs is above dub.cfg.minfuel (10%)',
+                            "the target body is in ArchHUD's atlas"],
+          'postconditions': ['done: the ship has stood still for 5 s within tol of the target',
+                             'cancelled, timed out, or failed on the way: the autopilot is off, the throttle '
+                             'is 0 and the brake is set']}}
 BODY_DEFS = {'hello': {'type': 'object',
            'required': ['boot', 'v', 'epoch', 'cseq'],
            'additionalProperties': False,

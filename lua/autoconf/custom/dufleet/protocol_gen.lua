@@ -191,4 +191,22 @@ return {
         ["R"] = "result",
         ["T"] = "telemetry",
     },
+    SKILL_PARAMS = {
+        ["goto"] = {
+            ["pos"] = {
+                ["required"] = true,
+            },
+            ["tol"] = {
+                ["required"] = false,
+                ["min"] = 1,
+                ["max"] = 100000,
+            },
+            ["timeout"] = {
+                ["required"] = false,
+                ["min"] = 10,
+                ["max"] = 86400,
+                ["default"] = 3600,
+            },
+        },
+    },
 }

@@ -81,7 +81,8 @@ Game files:
   - @supabase/ssr with getAll/setAll cookies, getClaims(), and the publishable key.
   - Server components by default; Tailwind; no emoji; dense tables.
 - packages/protocol/:
-  - Single source of truth (protocol.schema.json, vectors.json); regenerate constants, never hand-edit.
+  - Single source of truth (protocol.schema.json, vectors.json, skills.json); regenerate constants and the hub's
+    skills seed, never hand-edit.
   - Outbound lines are split at most 7 times (the JSON body may contain "|").
 - planner/: anthropic SDK; model ID from config (check the current model list when Phase 4 starts); tools generated
   from the skills registry.
