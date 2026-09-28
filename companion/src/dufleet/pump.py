@@ -10,6 +10,11 @@ A `run` command stays acked until the R frame for its job arrives. An R can over
 its command's A: a job can end in the tick it starts, and after a bus restart the
 "interrupted" R goes out before the replayed A. Such a result is held until the A is
 recorded.
+
+An R can also be lost in transit. T frames name the job the bus is running, so a job
+that T frames have not named for `idle_s` seconds has ended. The pump then asks for a
+`resend` of the frames since the job's A (request_resend), and if the R still has not
+come `lost_s` seconds later, fails the command as "result lost".
 """
 
 from __future__ import annotations
@@ -17,8 +22,10 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import logging
+import time
 from collections import Counter
 from collections.abc import Awaitable, Callable
+from dataclasses import dataclass
 
 from dufleet.hub import CommandRow, Hub
 from dufleet.protocol import CommandError, Message, build_command
@@ -32,6 +39,16 @@ Send = Callable[[str], Awaitable[None]]
 def error_text(body: dict) -> str:
     err, msg = body.get("err", "E_INTERNAL"), body.get("msg")
     return f"{err}: {msg}" if msg else str(err)
+
+
+@dataclass
+class _Job:
+    """A run command waiting for its job's R frame."""
+
+    command_id: str
+    ack_seq: int | None = None  # seq of the A, in the bus's current boot; None when unknown
+    absent_since: float | None = None  # first T frame that did not name the job, since one did
+    resend_at: float | None = None
 
 
 def job_of(cmd: CommandRow) -> str | None:
@@ -53,6 +70,9 @@ class CommandPump:
         poll_s: float = 2.0,
         ack_timeout: float | None = None,
         backoff: tuple[float, ...] | None = None,
+        idle_s: float = 10.0,
+        lost_s: float = 30.0,
+        clock: Callable[[], float] = time.monotonic,
     ):
         self.hub = hub
         self.bot_id = bot_id
@@ -64,7 +84,11 @@ class CommandPump:
         self.stats: Counter[str] = Counter()
         self._replies: asyncio.Queue[Message] = asyncio.Queue()
         self._wake = asyncio.Event()
-        self._jobs: dict[str, str] = {}
+        self.idle_s = idle_s
+        self.lost_s = lost_s
+        self.clock = clock
+        self._jobs: dict[str, _Job] = {}
+        self._looked_up = False  # whether acked jobs from before this process are tracked yet
         self._held: dict[str, Message] = {}  # results that came before their command's A
 
     def on_reply(self, msg: Message) -> None:
@@ -124,7 +148,7 @@ class CommandPump:
                     held = self._held.pop(job, None)
                     if held is not None:
                         return await self._finish(cmd.id, held)
-                    self._jobs[job] = cmd.id
+                    self._jobs[job] = _Job(cmd.id, reply.seq)
                     return "acked"
                 await self.hub.command_progress(cmd.id, "done", result=reply.body.get("data"))
                 return "done"
@@ -156,8 +180,10 @@ class CommandPump:
         """R frames from the router: finishes the command that started the job, now or once its
         A is recorded. Only the last 16 results without a command are held."""
         job = msg.body.get("job")
-        command_id = self._jobs.pop(job, None) or await self.hub.acked_command_for_job(self.bot_id, job)
-        command_id = command_id or self._jobs.pop(job, None)  # the A may have been recorded meanwhile
+        tracked = self._jobs.pop(job, None)
+        command_id = tracked.command_id if tracked else await self.hub.acked_command_for_job(self.bot_id, job)
+        if command_id is None and job in self._jobs:  # the A was recorded meanwhile
+            command_id = self._jobs.pop(job).command_id
         if command_id is None:
             self.stats["held results"] += 1
             self._held[job] = msg
@@ -167,6 +193,38 @@ class CommandPump:
                 log.warning("result for unknown job %s", dropped.body.get("job"))
             return
         await self._finish(command_id, msg)
+
+    async def on_telemetry(self, body: dict) -> None:
+        """T frames from the router: follows up jobs whose R frame may have been lost."""
+        now = self.clock()
+        if not self._looked_up:  # jobs acked before this process started
+            self._looked_up = True
+            for command_id, job in await self.hub.acked_jobs(self.bot_id):
+                self._jobs.setdefault(job, _Job(command_id))
+        running = body.get("job")
+        for job, entry in list(self._jobs.items()):
+            if job == running:
+                entry.absent_since = entry.resend_at = None
+            elif entry.absent_since is None:
+                entry.absent_since = now
+            elif entry.resend_at is None and now - entry.absent_since >= self.idle_s:
+                entry.resend_at = now
+                start = 0 if entry.ack_seq is None else entry.ack_seq + 1
+                log.info("job %s ended without its result; asking for frames from seq %d", job, start)
+                self.stats["resend requests"] += 1
+                await self.hub.request_resend(self.bot_id, start)
+                self.wake()
+            elif entry.resend_at is not None and now - entry.resend_at >= self.lost_s:
+                del self._jobs[job]
+                self.stats["lost results"] += 1
+                log.warning("job %s: result lost", job)
+                await self.hub.command_progress(entry.command_id, "failed",
+                                                error="E_STATE: result lost; the bus no longer runs the job")
+
+    def on_new_boot(self) -> None:
+        """The bus restarted, so seqs start over: resends for tracked jobs start from 0."""
+        for entry in self._jobs.values():
+            entry.ack_seq = None
 
     async def _finish(self, command_id: str, msg: Message) -> str:
         ok = msg.body.get("ok") is True

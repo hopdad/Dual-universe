@@ -1,6 +1,6 @@
 """The Hub on a Supabase project (supabase-py, async), signed in as the bot's device user.
 
-Every write goes through the RPCs in supabase/migrations/0003_rpc.sql or the tables row
+Every write goes through the RPCs in supabase/migrations (0003_rpc.sql, 0006_resend.sql) or the tables row
 level security opens to devices (bot_state, telemetry, events). Nothing here uses the
 service role. Realtime inserts on `commands` wake the pump; its poll covers any
 notification that is missed while the channel reconnects.
@@ -51,6 +51,14 @@ class SupabaseHub:
         res = await (self.client.table("commands").select("id").eq("bot_id", bot_id).eq("job_id", job_id)
                      .eq("status", "acked").order("created_at", desc=True).limit(1).execute())
         return str(res.data[0]["id"]) if res.data else None
+
+    async def acked_jobs(self, bot_id: str) -> list[tuple[str, str]]:
+        res = await (self.client.table("commands").select("id, job_id").eq("bot_id", bot_id).eq("verb", "run")
+                     .eq("status", "acked").execute())
+        return [(str(r["id"]), r["job_id"]) for r in res.data or [] if r.get("job_id")]
+
+    async def request_resend(self, bot_id: str, from_seq: int) -> None:
+        await self._rpc("request_resend", {"p_bot": bot_id, "p_from": from_seq})
 
     async def sync_epoch(self, bot_id: str, epoch: int, cseq: int) -> int:
         return int(await self._rpc("sync_epoch", {"p_bot": bot_id, "p_epoch": epoch, "p_cseq": cseq}))

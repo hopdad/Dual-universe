@@ -127,7 +127,7 @@ function Bus:sendHello()
 end
 
 function Bus:sendTelemetry()
-    local t = { st = self.runtime:status(), ap = adapter.autopilot() }
+    local t = { st = self.runtime:status(), job = self.runtime:jobId(), ap = adapter.autopilot() }
     local p = game.position()
     if p then t.w = { round1(p[1]), round1(p[2]), round1(p[3]) } end
     local body = adapter.body()

@@ -1,11 +1,13 @@
 """Reassembles frames from lines, drops corrupt ones, and counts what it dropped.
 
 Lines can arrive more than once: the optical reader captures a frame on every pass
-while it stays on screen, and a log tailer may re-read lines after a rotation. A
-chunk identical to one of a message delivered in the last `ttl` seconds is counted
-in `duplicates` and ignored, so feeding the same lines twice delivers each message
-once. Chunks of a message that never completed are not remembered, so a `resend`
-can fill the gap.
+while it stays on screen, a log tailer may re-read lines after a rotation, and a
+`resend` repeats frames that did arrive along with the one that did not. A chunk
+identical to one of a message delivered in the last `seen_ttl` seconds (10 minutes;
+at most `max_seen` chunks) is counted in `duplicates` and ignored, so feeding the
+same lines twice delivers each message once. Chunks of a message that never
+completed are not remembered, so a `resend` can fill the gap. Partial messages are
+dropped after `ttl` seconds.
 """
 
 from __future__ import annotations
@@ -38,8 +40,11 @@ class _Pending:
 
 
 class Deframer:
-    def __init__(self, ttl: float = g.REASSEMBLY_TTL_S, clock: Callable[[], float] = time.monotonic):
+    def __init__(self, ttl: float = g.REASSEMBLY_TTL_S, clock: Callable[[], float] = time.monotonic,
+                 seen_ttl: float = 600.0, max_seen: int = 8192):
         self.ttl = ttl
+        self.seen_ttl = seen_ttl
+        self.max_seen = max_seen
         self.clock = clock
         self.pending: dict[tuple[str, str, int, int], _Pending] = {}
         self.seen: dict[Chunk, float] = {}
@@ -98,5 +103,8 @@ class Deframer:
         for key in [k for k, v in self.pending.items() if now - v.started > self.ttl]:
             del self.pending[key]
             self.dropped["incomplete"] += 1
-        for chunk in [c for c, t in self.seen.items() if now - t > self.ttl]:
+        while self.seen:  # oldest first: entries go in as they are delivered
+            chunk, delivered = next(iter(self.seen.items()))
+            if now - delivered <= self.seen_ttl and len(self.seen) < self.max_seen:  # room for the new line
+                break
             del self.seen[chunk]

@@ -68,13 +68,24 @@ def test_repeated_lines_deliver_once():
     assert not d.pending and not d.dropped
 
 
-def test_duplicates_are_forgotten_after_the_ttl():
+def test_duplicates_are_remembered_long_enough_for_a_resend():
     clock = Clock()
     d = Deframer(ttl=10, clock=clock)
-    line = encode_frame("b1", "A", 10, '{"ref":1,"e":1}')[0]
+    line = encode_frame("b1", "E", 10, '{"ev":"skill_state"}')[0]
     assert d.feed(line)
-    clock.now = 10.5
+    clock.now = 60  # a resend a minute later repeats it
+    assert d.feed(line) is None
+    clock.now = 661
     assert d.feed(line)
+
+
+def test_only_the_newest_chunks_are_remembered():
+    d = Deframer(max_seen=3)
+    lines = [encode_frame("b1", "T", seq, "{}")[0] for seq in range(1, 6)]
+    for line in lines:
+        assert d.feed(line)
+    assert len(d.seen) == 3
+    assert d.feed(lines[0]) and d.feed(lines[-1]) is None
 
 
 def test_incomplete_messages_expire_and_resend_completes_them():

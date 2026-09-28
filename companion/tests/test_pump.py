@@ -294,3 +294,108 @@ def test_the_pump_rides_out_hub_errors():
         assert pump.stats["errors"] == 2
 
     asyncio.run(main())
+
+
+class Clock:
+    def __init__(self):
+        self.now = 0.0
+
+    def __call__(self):
+        return self.now
+
+
+def watched(hub=None, bus=None, clock=None):
+    """A pump that follows up lost results, on a clock the test moves."""
+    hub, bus, clock = hub or FakeHub(), bus or FakeBus(), clock or Clock()
+    pump = CommandPump(hub, hub.bot_id, bus.send, idle_s=10, lost_s=30, clock=clock, **FAST)
+    bus.deliver = FrameRouter(hub, hub.bot_id, pump).feed
+    return hub, bus, pump, clock
+
+
+async def telemetry(bus, clock, at, **body):
+    """A T frame at time `at`, handled before the test goes on."""
+    clock.now = at
+    await bus.emit("T", {"st": "idle", **body})
+    await asyncio.sleep(0.02)
+
+
+def test_a_lost_result_is_sent_again():
+    async def main():
+        hub, bus, pump, clock = watched()
+        hub.queue("run", "goto", "j_1", "pos=0,2,1,2,3")
+        task = asyncio.create_task(pump.run())
+        await until(lambda: hub.status(1) == "acked")
+        await telemetry(bus, clock, 0, st="goto:travel", job="j_1")
+        bus.lose_kinds["R"] = 1
+        await bus.emit("R", {"job": "j_1", "skill": "goto", "ok": True, "data": {"dist": 2.8}})
+        await telemetry(bus, clock, 1)  # the job is over, but its R never came
+        await telemetry(bus, clock, 10)
+        assert hub.status(1) == "acked" and pump.stats["resend requests"] == 0
+        await telemetry(bus, clock, 11)  # 10 s since: ask for everything after the run's A (seq 1)
+        await until(lambda: hub.status(1) == "done")
+        task.cancel()
+        assert hub.row(1)["result"] == {"dist": 2.8}
+        resend = hub.row(2)
+        assert (resend["verb"], resend["args"], resend["created_by"], resend["status"]) == (
+            "resend", ["2"], "companion", "done")
+        assert pump.stats["resend requests"] == 1 and pump.stats["lost results"] == 0
+
+    asyncio.run(main())
+
+
+def test_a_result_the_bus_cannot_send_again_fails_its_command():
+    async def main():
+        hub, bus, pump, clock = watched()
+        hub.queue("run", "goto", "j_1", "pos=0,2,1,2,3")
+        task = asyncio.create_task(pump.run())
+        await until(lambda: hub.status(1) == "acked")
+        bus.lose_kinds["R"] = 1
+        await bus.emit("R", {"job": "j_1", "skill": "goto", "ok": True})
+        bus.ring.clear()  # gone from the bus's ring too
+        await telemetry(bus, clock, 0)
+        await telemetry(bus, clock, 10)
+        await until(lambda: hub.status(2) == "done")  # the resend went out and brought nothing
+        await telemetry(bus, clock, 39)
+        assert hub.status(1) == "acked"
+        await telemetry(bus, clock, 40)
+        task.cancel()
+        assert hub.status(1) == "failed"
+        assert hub.row(1)["error"] == "E_STATE: result lost; the bus no longer runs the job"
+        assert pump.stats["lost results"] == 1
+
+    asyncio.run(main())
+
+
+def test_a_job_the_bus_still_runs_is_left_alone():
+    async def main():
+        hub, bus, pump, clock = watched()
+        hub.queue("run", "patrol", "j_1")
+        task = asyncio.create_task(pump.run())
+        await until(lambda: hub.status(1) == "acked")
+        await telemetry(bus, clock, 0)  # an older T that the A overtook
+        for at in (1, 30, 60, 120):
+            await telemetry(bus, clock, at, st="patrol:dwell", job="j_1")
+        task.cancel()
+        assert hub.status(1) == "acked" and pump.stats["resend requests"] == 0
+
+    asyncio.run(main())
+
+
+def test_jobs_acked_before_a_restart_are_followed_up_too():
+    async def main():
+        hub, bus, clock = FakeHub(), FakeBus(), Clock()
+        hub, bus, pump, clock = watched(hub, bus, clock)
+        hub.queue("run", "goto", "j_1", "pos=0,2,1,2,3")
+        await drive(pump, lambda: hub.status(1) == "acked")
+        bus.lose_kinds["R"] = 1
+        await bus.emit("R", {"job": "j_1", "skill": "goto", "ok": False, "err": "E_STATE", "msg": "cancelled"})
+        _, _, pump2, _ = watched(hub, bus, clock)  # a new companion knows nothing of j_1 but what the hub says
+        task = asyncio.create_task(pump2.run())
+        await telemetry(bus, clock, 0)
+        await telemetry(bus, clock, 10)
+        await until(lambda: hub.status(1) == "failed")
+        task.cancel()
+        assert hub.row(1)["error"] == "E_STATE: cancelled"  # the real result, not "result lost"
+        assert hub.row(2)["args"] == ["0"]  # the A's seq is unknown after the restart: from the start
+
+    asyncio.run(main())

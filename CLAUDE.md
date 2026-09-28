@@ -72,7 +72,8 @@ Game files:
   - SQL migrations only. RLS on every table, including command_seq.
   - cseq is assigned by the server and immutable; one command in flight per bot; claims take a lease.
   - Device users move commands and report status only through RPCs (claim_next_command, recover_inflight,
-    command_progress, bot_report, sync_epoch), never the service role. Column grants keep epoch, cseq, status and
+    command_progress, bot_report, sync_epoch, and request_resend, the one command they may queue), never the
+    service role. Column grants keep epoch, cseq, status and
     ownership out of client writes.
   - Scenario tests: supabase/tests/run.sh on plain PostgreSQL (docs/verification/sql keeps the handoff comparison).
 - dashboard/:

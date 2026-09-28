@@ -56,7 +56,7 @@ JSON Schemas for every body are in `protocol.schema.json` under `$defs`. Unknown
 | `E` event | `event` | `ev` (`[a-z][a-z0-9_]{0,31}`). Optional `job`, `skill`, `from`, `to`, `data` | 1 | yes |
 | `R` result | `result` | `job`, `skill`, `ok`. Optional `data`, `err`, `msg` | 1 | yes |
 | `H` hello | `hello` | `boot`, `v` (bus semver), `epoch`, `cseq`. Optional `id`, `ah` (ArchHUD commit), `tr`, `ml`, `q` | 1 | no |
-| `T` telemetry | `telemetry` | none. `w`, `v`, `alt`, `b`, `g`, `fuel`, `cargo`, `st`, `ap`, `x` | 2 | no |
+| `T` telemetry | `telemetry` | none. `w`, `v`, `alt`, `b`, `g`, `fuel`, `cargo`, `st`, `job`, `ap`, `x` | 2 | no |
 | `D` debug | `debug` | `msg` (≤ 300 chars) | 3 | no |
 
 Examples:
@@ -167,10 +167,16 @@ A `run` starts a job. The bus runs one at a time, and the job reports back on it
 - While the job runs:
   - each phase change sends `E` `{"ev":"skill_state","job":…,"skill":…,"from":…,"to":…}`, the first from `idle`;
   - `T.st` reads `<skill>:<phase>`.
+- While the job runs, `T.job` holds its id.
 - The job ends with one `R`:
   - `ok: true` with the skill's `data`;
   - or `ok: false` with `err`, `msg`, and sometimes `data`.
   - The companion keeps the `run` command `acked` until the `R` arrives, then finishes it with the result.
+- An `R` lost in transit is recovered like this:
+  - Once `T` frames have stopped naming the job for 10 s, the companion knows the job ended.
+  - It has the hub queue `resend <seq after the run's A>` (`request_resend`, the one command a device may queue). The bus's replay ring still holds the `R`, so it comes back.
+  - If the `R` has not come 30 s later, the companion fails the command with `E_STATE` `"result lost"`.
+  - After a restart of either side, the resend starts from seq 0.
 - `cancel [job]`:
   - stops the ship and ends the job with `R` `E_STATE` `"cancelled"`;
   - with no job running, it still stops the ship and answers `{"data":{"idle":true}}`;
@@ -249,5 +255,6 @@ return { v = 1, n = 17, lines = { "/b 1.42 ping #A5F2" } }
 
 | Version | Date | Change |
 |---|---|---|
+| 1 | 2026-09-28 | `T.job`, and recovery of an `R` lost in transit through `resend`. Additive: the frames are otherwise unchanged |
 | 1 | 2026-09-27 | Jobs: the job verbs, `skill_state` events, `R`, `dub.job`, and the `goto` skill. The wire format is unchanged. `cancel` now stops the ship even with no job running |
 | 1 | 2026-09-27 | First version. Against handoff §2: a bounded split, the CRC scope, an epoch in the command header, one watermark key, `chan` and `b64` argument types, `::pos` refused, `maxline` in bytes, duplicate suppression |

@@ -311,4 +311,27 @@ do $$ begin
     'no function in public is executable by anon or PUBLIC';
 end $$;
 
+\echo 'H18 devices queue resend for their own bot only, reusing one that already covers it'
+-- Bot 1 went in H15: this runs on owner B's bot and device B.
+:as_device_b
+select public.request_resend('22222222-0000-0000-0000-000000000002', 40);
+select public.request_resend('22222222-0000-0000-0000-000000000002', 45);
+do $$ begin
+  assert (select count(*) from public.commands where verb = 'resend') = 1, 'from 40 covers 45';
+  assert (select args = '["40"]' and created_by = 'companion' and status = 'queued' and cseq > 0
+            from public.commands where verb = 'resend'), 'numbered like any command';
+end $$;
+select public.request_resend('22222222-0000-0000-0000-000000000002', 30);
+do $$ begin
+  assert (select count(*) from public.commands where verb = 'resend') = 2, 'from 30 needs its own';
+end $$;
+select test.expect_error($q$select public.request_resend('22222222-0000-0000-0000-000000000002', -1)$q$, '22023');
+select test.expect_error($q$select public.request_resend('22222222-0000-0000-0000-000000000002', 4294967296)$q$, '22023');
+:as_device_a
+select test.expect_error($q$select public.request_resend('22222222-0000-0000-0000-000000000002', 1)$q$, '42501');
+:as_owner_b
+select test.expect_error($q$select public.request_resend('22222222-0000-0000-0000-000000000002', 1)$q$, '42501');
+:as_anon
+select test.expect_error($q$select public.request_resend('22222222-0000-0000-0000-000000000002', 1)$q$, '42501');
+
 \echo 'all hub scenarios passed'

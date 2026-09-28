@@ -92,9 +92,10 @@ def test_every_rpc_and_parameter_exists_in_the_sql():
     run(hub.sync_epoch("b", 1, 7))
     rec.data = None
     run(hub.bot_report("b", BotReport("ready", "0.1.0", "k3f9", "2.105")))
+    run(hub.request_resend("b", 42))
     rpcs = [c for c in rec.calls if "rpc" in c]
     assert [c["rpc"] for c in rpcs] == ["recover_inflight", "claim_next_command", "command_progress", "sync_epoch",
-                                        "bot_report"]
+                                        "bot_report", "request_resend"]
     for c in rpcs:
         assert c["rpc"] in functions, c["rpc"]
         assert set(c["params"]) == functions[c["rpc"]], (c["rpc"], set(c["params"]), functions[c["rpc"]])
@@ -127,3 +128,10 @@ def test_job_lookup_filters_on_bot_job_and_acked():
     assert run(SupabaseHub(rec).acked_command_for_job("b", "j_1")) == "c9"
     eqs = [args for name, args, _ in rec.calls[0]["steps"] if name == "eq"]
     assert eqs == [("bot_id", "b"), ("job_id", "j_1"), ("status", "acked")]
+
+
+def test_acked_jobs_lists_the_bots_acked_run_commands():
+    rec = Recorder([{"id": "c9", "job_id": "j_1"}, {"id": "c8", "job_id": None}])
+    assert run(SupabaseHub(rec).acked_jobs("b")) == [("c9", "j_1")]
+    eqs = [args for name, args, _ in rec.calls[0]["steps"] if name == "eq"]
+    assert eqs == [("bot_id", "b"), ("verb", "run"), ("status", "acked")]

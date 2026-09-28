@@ -2,7 +2,8 @@
 
 - A, N: the pump.
 - H: sync_epoch and bot_report. A new boot id also drops the bot's partial messages.
-- T: bot_state at most once per `state_every` seconds, a telemetry row every `telemetry_every`.
+- T: bot_state at most once per `state_every` seconds, a telemetry row every `telemetry_every`,
+  and every T to the pump, which follows up jobs whose R frame may have been lost.
 - E: an event named after `ev`. R: the pump, which finishes the job's command. D: a `bus_debug` event.
 
 Bodies that do not match the protocol schema are dropped and counted.
@@ -97,6 +98,7 @@ class FrameRouter:
         elif msg.kind == "H":
             await self._hello(msg)
         elif msg.kind == "T":
+            await self.pump.on_telemetry(msg.body)
             await self._telemetry(msg.body)
         elif msg.kind == "E":
             await self.hub.insert_event(self.bot_id, msg.body["ev"], 0, msg.body)
@@ -110,6 +112,7 @@ class FrameRouter:
         if self.boot is not None and body["boot"] != self.boot:
             log.info("bus restarted (boot %s -> %s)", self.boot, body["boot"])
             self.deframer.forget(msg.bot)
+            self.pump.on_new_boot()
         self.boot = body["boot"]
         self.hub_epoch = await self.hub.sync_epoch(self.bot_id, body["epoch"], body["cseq"])
         await self.hub.bot_report(self.bot_id, BotReport("ready", body["v"], body["boot"], body.get("ah")))

@@ -9,6 +9,7 @@ SQL migrations for the mydu-fleet hub. They replace the handoff's `0001`–`0004
 | `0003_rpc.sql` | `claim_next_command`, `recover_inflight`, `command_progress`, `cancel_command`, `bot_report`, `sync_epoch` |
 | `0004_realtime.sql` | The `supabase_realtime` publication (`telemetry` stays out) |
 | `0005_retention.sql` | pg_cron jobs: telemetry after 7 days, minor events after 30, finished commands after 90 |
+| `0006_resend.sql` | `request_resend`: the one command a device may queue, to get a lost job result sent again |
 
 The tables live in `public`, so use a Supabase project of their own (open question 1 in the plan). There is no `config.toml` yet: `supabase init` creates one once the hosting is chosen. Until then, apply the files in order with `supabase db push` or `psql`.
 
@@ -20,7 +21,7 @@ Everyone signs in; nothing uses the service role.
 |---|---|---|
 | `servers`, `goals` | Read and write their own | – |
 | `bots` | Create, rename, delete, set `device_user_id` | Read its own bot; report through `bot_report` |
-| `commands` | Queue commands (bot, verb, args, job, goal); cancel through `cancel_command` | Read; move through `claim_next_command`, `recover_inflight`, `command_progress` |
+| `commands` | Queue commands (bot, verb, args, job, goal); cancel through `cancel_command` | Read; move through `claim_next_command`, `recover_inflight`, `command_progress`; queue a `resend` through `request_resend` |
 | `bot_state`, `telemetry` | Read | Write for its own bot |
 | `events` | Read; write events without a bot | Write for its own bot; events belong to the bot's owner |
 | `skills` | Read | Read |

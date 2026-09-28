@@ -47,6 +47,11 @@ local function argsText(params)
     return table.concat(list, " ")
 end
 
+-- The running job's id, or nil: T.job, which tells the companion the job has not ended.
+function Runtime:jobId()
+    return self.job and self.job.id
+end
+
 -- "idle", or "<skill>:<phase>" for T.st.
 function Runtime:status()
     local job = self.job

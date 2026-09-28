@@ -1,4 +1,4 @@
-"""What the companion needs from the hub (supabase/migrations/0003_rpc.sql).
+"""What the companion needs from the hub (supabase/migrations/0003_rpc.sql and 0006_resend.sql).
 
 The pump and the frame router depend only on this interface, so they can run
 against the Supabase client in production and against fakes or plain PostgreSQL
@@ -61,6 +61,12 @@ class Hub(Protocol):
 
     async def acked_command_for_job(self, bot_id: str, job_id: str) -> str | None:
         """The id of the acked command that started this job, if any (for R frames after a restart)."""
+
+    async def acked_jobs(self, bot_id: str) -> list[tuple[str, str]]:
+        """(command id, job id) of each run command still waiting for its job's R frame."""
+
+    async def request_resend(self, bot_id: str, from_seq: int) -> None:
+        """Queues `resend from_seq` for the bot, unless a queued resend already covers it."""
 
     async def sync_epoch(self, bot_id: str, epoch: int, cseq: int) -> int:
         """Passes on the bus watermark from an H frame; returns the hub's epoch."""

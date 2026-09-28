@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+from collections import Counter
 from collections.abc import Awaitable, Callable
 from typing import Any
 
@@ -34,7 +35,8 @@ class FakeHub:
     def queue(self, verb: str, *args: str) -> dict[str, Any]:
         row = {"id": f"cmd-{self.epoch}-{self.next}", "bot_id": self.bot_id, "epoch": self.epoch, "cseq": self.next,
                "verb": verb, "args": list(args), "status": "queued", "attempts": 0, "claimed_at": None,
-               "job_id": args[1] if verb == "run" and len(args) >= 2 else None, "error": None, "result": None}
+               "job_id": args[1] if verb == "run" and len(args) >= 2 else None, "error": None, "result": None,
+               "created_by": "user"}
         self.next += 1
         self.commands.append(row)
         return row
@@ -85,6 +87,15 @@ class FakeHub:
         rows = [r for r in self.commands if r["job_id"] == job_id and r["status"] == "acked"]
         return rows[-1]["id"] if rows else None
 
+    async def acked_jobs(self, bot_id: str) -> list[tuple[str, str]]:
+        return [(r["id"], r["job_id"]) for r in self.commands if r["verb"] == "run" and r["status"] == "acked"]
+
+    async def request_resend(self, bot_id: str, from_seq: int) -> None:
+        for r in self.commands:
+            if r["verb"] == "resend" and r["status"] == "queued" and int(r["args"][0]) <= from_seq:
+                return
+        self.queue("resend", str(from_seq))["created_by"] = "companion"
+
     async def sync_epoch(self, bot_id: str, epoch: int, cseq: int) -> int:
         self.syncs.append((epoch, cseq))
         if epoch > self.epoch or (epoch == self.epoch and cseq >= self.next):
@@ -107,7 +118,7 @@ class FakeHub:
         self.events.append((kind, severity, data))
 
 
-Handler = Callable[[Any], tuple[str, dict]]
+Handler = Callable[[Any], tuple]  # (kind, fields) or (kind, fields, follow-up)
 
 
 class FakeBus:
@@ -123,13 +134,26 @@ class FakeBus:
         self.seq = 0
         self.lose_lines = 0  # lines lost before they reach the bus
         self.lose_replies = 0  # A and N frames lost on the way back
+        self.lose_kinds: Counter[str] = Counter()  # frames of these kinds lost on the way back, once each
         self.damage_lines = 0  # lines that arrive garbled
+        self.ring: list[tuple[int, str, dict]] = []  # sent A, N, E and R frames, for resend
         self.handlers: dict[str, Handler] = {
             "pause": lambda cmd: ("N", {"err": "E_BUSY", "msg": "skill goto running"}),
             "run": lambda cmd: ("A", {"job": cmd.named["job"]}),
             "db": lambda cmd: ("A", {"data": {"k": cmd.named["key"], "v": "42"}}),
+            "resend": lambda cmd: ("A", {}, self._replayer(int(cmd.named["from"]))),
         }
         self._tasks: set[asyncio.Task] = set()
+
+    def _replayer(self, start: int) -> Callable[[], Awaitable[None]]:
+        """Sends the ring frames from seq `start` on again, with their seq, after the reply (as the bus does)."""
+        frames = [f for f in self.ring if f[0] >= start]
+
+        async def replay() -> None:
+            for seq, kind, body in frames:
+                await self.emit(kind, body, seq=seq)
+
+        return replay
 
     async def send(self, line: str) -> None:
         """The pump's transport."""
@@ -147,11 +171,13 @@ class FakeBus:
             return
         outcome = decide(self.epoch, self.cseq, cmd.epoch, cmd.cseq)
         if outcome == "execute":
-            kind, fields = self.handlers.get(cmd.verb, lambda c: ("A", {}))(cmd)
+            kind, fields, *after = self.handlers.get(cmd.verb, lambda c: ("A", {}))(cmd)
             body = {**fields, "ref": cmd.cseq, "e": cmd.epoch}
             self.epoch, self.cseq, self.reply = cmd.epoch, cmd.cseq, (kind, body)
             self.executed.append((cmd.epoch, cmd.cseq, cmd.verb))
             await self.emit(kind, body)
+            for follow_up in after:
+                await follow_up()
         elif outcome == "replay":
             kind, body = self.reply
             await self.emit(kind, {**body, "dup": True})
@@ -160,13 +186,20 @@ class FakeBus:
         else:
             await self.emit("N", {"ref": cmd.cseq, "e": cmd.epoch, "err": "E_STATE"})
 
-    async def emit(self, kind: str, body: dict) -> None:
-        """Sends a frame to the companion, as the transport would carry it."""
+    async def emit(self, kind: str, body: dict, seq: int | None = None) -> None:
+        """Sends a frame to the companion, as the transport would carry it. A resent frame keeps its seq."""
+        if seq is None:
+            self.seq += 1
+            seq = self.seq
+            if kind in ("A", "N", "E", "R"):
+                self.ring = [*self.ring, (seq, kind, body)][-32:]
         if kind in ("A", "N") and self.lose_replies:
             self.lose_replies -= 1
             return
-        self.seq += 1
-        lines = encode_frame(self.bot, kind, self.seq, json.dumps(body, separators=(",", ":")))
+        if self.lose_kinds[kind] > 0:
+            self.lose_kinds[kind] -= 1
+            return
+        lines = encode_frame(self.bot, kind, seq, json.dumps(body, separators=(",", ":")))
         task = asyncio.get_running_loop().create_task(self._deliver(lines))
         self._tasks.add(task)
         task.add_done_callback(self._tasks.discard)

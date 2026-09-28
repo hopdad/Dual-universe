@@ -26,6 +26,10 @@ pytestmark = [
 
 
 class Chain:
+    def __init__(self, **pump_opts):
+        self.pump_opts = pump_opts
+        self.lose = set()  # frame kinds to lose once each on their way to the companion
+
     async def open(self):
         self.owner = await connect_as(DB, OWNER)
         self.device = await connect_as(DB, DEVICE)
@@ -42,7 +46,7 @@ class Chain:
 
     def new_companion(self):
         """A companion process: pump, router and deframer, attached to the running game."""
-        self.pump = CommandPump(self.hub, self.bot, self.sim.send, transport="C")
+        self.pump = CommandPump(self.hub, self.bot, self.sim.send, transport="C", **self.pump_opts)
         self.router = FrameRouter(self.hub, self.bot, self.pump)
         spy = self.pump.on_reply
 
@@ -50,8 +54,15 @@ class Chain:
             self.replies.append(msg.body)
             spy(msg)
 
+        async def on_line(line):
+            kind = line.split("|", 4)[3] if line.startswith("@@DUB|") else None
+            if kind in self.lose:
+                self.lose.discard(kind)
+                return
+            await self.router.feed(line)
+
         self.pump.on_reply = on_reply
-        self.sim.on_line = self.router.feed
+        self.sim.on_line = on_line
 
     async def queue(self, verb, *args):
         await self.owner.execute("insert into public.commands (bot_id, verb, args) values (%s, %s, %s::jsonb)",
@@ -132,6 +143,27 @@ def test_a_goto_job_flies_and_finishes_its_command():
                                     " order by id", (c.bot,))
         moves = [(e["data"]["from"], e["data"]["to"]) for e in await cur.fetchall()]
         assert moves == [("idle", "engage"), ("engage", "travel"), ("travel", "settle")]
+        await c.close()
+
+    asyncio.run(main())
+
+
+def test_a_result_lost_in_transit_is_sent_again():
+    async def main():
+        c = await Chain(idle_s=2).open()
+        c.lose.add("R")  # the job's result never reaches the companion
+        await c.queue("run", "goto", "j_lost1", "pos=0,0,-123000,98765,42")
+
+        async def finished():
+            return (await c.rows())[0]["status"] in ("done", "failed")
+
+        async with running(c.pump):
+            await c.until(finished, timeout=30)
+        run, *rest = await c.rows()
+        assert (run["status"], run["result"]) == ("done", {"dist": 5, "t": run["result"]["t"]})
+        # T frames stopped naming the job, so the pump had the hub queue a resend, and the bus sent the R again
+        assert [(r["verb"], r["created_by"], r["status"]) for r in rest] == [("resend", "companion", "done")]
+        assert c.pump.stats["resend requests"] == 1
         await c.close()
 
     asyncio.run(main())

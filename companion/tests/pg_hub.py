@@ -73,6 +73,14 @@ class PgHub:
                               " order by created_at desc limit 1", (bot_id, job_id))
         return str(row["id"]) if row else None
 
+    async def acked_jobs(self, bot_id: str) -> list[tuple[str, str]]:
+        cur = await self.conn.execute("select id, job_id from public.commands where bot_id = %s and verb = 'run'"
+                                      " and status = 'acked'", (bot_id,))
+        return [(str(r["id"]), r["job_id"]) for r in await cur.fetchall()]
+
+    async def request_resend(self, bot_id: str, from_seq: int) -> None:
+        await self.conn.execute("select public.request_resend(%s, %s)", (bot_id, from_seq))
+
     async def sync_epoch(self, bot_id: str, epoch: int, cseq: int) -> int:
         row = await self._one("select public.sync_epoch(%s, %s, %s) as epoch", (bot_id, epoch, cseq))
         return row["epoch"]
