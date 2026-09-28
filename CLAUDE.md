@@ -52,8 +52,9 @@ same commit):
 - ArchHUD writes only its own keys to dbHud_1 and never clears it. Our keys use the "dub." prefix there.
 
 Game files:
-- The only game files we write are archhud/userclass.lua and autoconf/custom/dufleet/ (plus ArchHUD's own files
-  at install). Never read or modify client memory.
+- The only game files we write are archhud/userclass.lua and autoconf/custom/dufleet/, plus, at install,
+  ArchHUD's own files, atlas.lua, and backups under autoconf/custom/_dufleet_backup/. Never read or modify
+  client memory.
 
 ## Stack and conventions
 - lua/:
