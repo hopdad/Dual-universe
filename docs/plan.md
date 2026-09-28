@@ -174,6 +174,11 @@ Core, which needs no ADR:
 - CLI: `run`, `install`, `doctor`, `replay`.
 
 - Done 2026-09-27 ([companion/README.md](../companion/README.md)): the command pump and frame router behind a `Hub` interface, tested against an in-memory hub, a reference bus, the real Lua bus output, and the real hub SQL on PostgreSQL (including exactly-once delivery across a companion restart). The Supabase client (`SupabaseHub`) is in, checked against the migrations. A virtual bot (`dufleet sim`, the real Lua bus in its fake ArchHUD) runs the whole chain without the game. CI tests it end to end on PostgreSQL. `dufleet install` and `dufleet doctor` put the bus, ArchHUD and the atlas into the game folder and check them by SHA-256. Still to come: config and `run`.
+- To do, lost frames. The bus numbers frames per boot and keeps its last 32 A, N, E and R frames for `resend`, but nothing asks for them yet. So an R frame lost in transit leaves its `run` command `acked`, with the planner's ETA timeout (Phase 4) as the only backstop. The fix:
+  - the companion watches for gaps in `seq` and asks for `resend`;
+  - `resend` needs an epoch and cseq from the hub like any command, and device users cannot insert commands, so it also needs a device RPC that queues one.
+
+  Decide with ADR-0001, since how often frames go missing depends on the transport.
 
 Transport adapters *(ADR-0001)*:
 - Out: `ingest/log_tailer` (a `<record>` splitter with `stat()` polling) or `ingest/optical` with a `calibrate` command.
