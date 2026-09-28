@@ -27,7 +27,8 @@ local function installAutopilot(h)
     galaxyReference = { [0] = { [0] = space, [2] = M.ALIOTH } }
     vec3 = function(x, y, z) return { x = x, y = y, z = z } end
     h.added, h.replaced, h.toggles, h.hops, h.cleared, h.throttle = {}, 0, {}, 0, 0, nil
-    h.inAtmo, h.flySpeed, h.miss = true, 2000, { 3, 4, 0 }
+    h.flySpeed, h.miss = 2000, { 3, 4, 0 }
+    inAtmo = true -- ArchHUD's own flag, as its ticks set it
 
     local function order()
         AtlasOrdered = {}
@@ -36,6 +37,7 @@ local function installAutopilot(h)
     end
     order()
     AutopilotTargetIndex, CustomTarget, apRoute = 0, nil, {}
+    atmoTanks, spaceTanks, rocketTanks = {}, {}, {}
     for _, name in ipairs(TRAVEL) do _G[name] = false end
 
     local function planetName(position)
@@ -76,12 +78,12 @@ local function installAutopilot(h)
     end
     function AP.ToggleAutopilot()
         local last = h.toggles[#h.toggles]
-        if last and h.clock - last < 1.5 and h.inAtmo then h.hops = h.hops + 1 end
+        if last and h.clock - last < 1.5 and inAtmo then h.hops = h.hops + 1 end
         h.toggles[#h.toggles + 1] = h.clock
         if (AutopilotTargetIndex > 0 or #apRoute > 0) and not Autopilot and not VectorToTarget and not spaceLaunch
             and not IntoOrbit then
             ATLAS.UpdateAutopilotTarget()
-            if CustomTarget and CustomTarget.planetname ~= "Space" and h.inAtmo then
+            if CustomTarget and CustomTarget.planetname ~= "Space" and inAtmo then
                 VectorToTarget, AltitudeHold = true, true
             else
                 Autopilot, AutopilotStatus = true, "Aligning"

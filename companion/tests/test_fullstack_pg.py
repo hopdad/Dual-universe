@@ -105,8 +105,9 @@ def test_commands_round_trip_through_the_real_bus():
         cur = await c.owner.execute("select status, script_version, archhud_version from public.bots where id = %s",
                                     (c.bot,))
         assert await cur.fetchone() == {"status": "ready", "script_version": "0.1.0", "archhud_version": "2.105"}
-        cur = await c.owner.execute("select autopilot, speed_kmh from public.bot_state where bot_id = %s", (c.bot,))
-        assert await cur.fetchone() == {"autopilot": "manual", "speed_kmh": 18}
+        cur = await c.owner.execute("select autopilot, speed_kmh, fuel from public.bot_state where bot_id = %s",
+                                    (c.bot,))
+        assert await cur.fetchone() == {"autopilot": "manual", "speed_kmh": 18, "fuel": {"atmo": 0.82, "space": 0.64}}
         await c.close()
 
     asyncio.run(main())

@@ -211,6 +211,11 @@ How a `goto` ends:
   - a travel mode is set;
   - an ArchHUD route is loaded (the autopilot would fly the route instead);
   - the body is not in ArchHUD's atlas.
+- Refused at `run` with `E_FUEL` (`"atmo fuel 3%, under the 10% minimum"`) when a fuel type the trip needs is below `dub.cfg.minfuel`:
+  - atmospheric fuel while the ship is in atmosphere;
+  - space fuel while it is in space, or when the target is on another body or in deep space.
+
+  Fuel types the ship has no tanks for are not checked.
 - Failed with `E_STATE`, each after the bus stops the ship:
   - `"stopped N m from the target"`, with `data.dist`;
   - `"autopilot off and still moving, N m from the target"`: 30 s without a travel mode;
@@ -227,7 +232,7 @@ The bus writes only `dub.`-prefixed keys in ArchHUD's `dbHud_1`, which ArchHUD n
 | `dub.id` | Bot id |
 | `dub.last` | Watermark and last reply (above) |
 | `dub.job` | The running job as JSON: `job`, `skill`, `args` (its parameters), `phase`, `paused` ([Jobs](#jobs)) |
-| `dub.cfg.<name>` | Bus settings, read at start: `tick` (0.25 s), `maxline` (400), `lines` per tick (2), `telemetry` period (1 s) |
+| `dub.cfg.<name>` | Bus settings, read at start: `tick` (0.25 s), `maxline` (400), `lines` per tick (2), `telemetry` period (1 s), `minfuel` for a `goto` to start (0.1; 0 turns the check off) |
 | `dub.*` | Anything written with `db set` |
 
 ### Transport F inbox (provisional, pending S11)

@@ -20,6 +20,9 @@ local fake = require("fake_archhud")
 local out = {}
 local function start(dbMock, clock)
     local h = fake.install({ dbMock = dbMock, clock = clock })
+    -- A ship with some fuel: one atmospheric tank at 82%, one space tank at 64%.
+    _G.atmoTanks, _G.spaceTanks = { { 101, "atmo", 1000, 50 } }, { { 201, "space", 3000, 200 } }
+    h.coreMock.elements[101], h.coreMock.elements[201] = { mass = 870 }, { mass = 2120 }
     require("autoconf/custom/archhud/userclass")
     userBase.ExtraOnStart()
     return h

@@ -43,6 +43,15 @@ function M.velocity()
     return nil
 end
 
+-- Mass of one of the construct's elements, kg.
+function M.elementMass(id)
+    if core and core.getElementMassById then
+        local m = core.getElementMassById(id)
+        if type(m) == "number" then return m end
+    end
+    return nil
+end
+
 -- Altitude above sea level of the nearest planet, metres; 0 in space.
 function M.altitude()
     if core and core.getAltitude then

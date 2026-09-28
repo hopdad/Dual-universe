@@ -157,7 +157,7 @@ Items marked *(ADR-0001)* wait for the transport decision. Everything else can s
   - persistence: `dub.`-prefixed keys in ArchHUD's `dbHud_1`, which ArchHUD writes key by key and never clears;
   - `archhud_adapter`: the only module that touches ArchHUD internals.
 - Transports *(ADR-0001)*: `print` (L) or `optical` through `userScreen` (O); `inbox` (F) or chat only (C).
-- Done 2026-09-27 ([lua/README.md](../lua/README.md)): the shim, adapter, dispatcher, builtins, outbox, persistence, codec, and collectors for position, speed, altitude, autopilot mode, and body with latitude and longitude (from ArchHUD's `planet`), under busted and luacheck. Frames go out through `print` until ADR-0001. Still to come: fuel and cargo collectors (ArchHUD keeps its tank percentages in HUD-local tables, so the bus must read the tanks itself), and the transports.
+- Done 2026-09-27 ([lua/README.md](../lua/README.md)): the shim, adapter, dispatcher, builtins, outbox, persistence, codec, and collectors for position, speed, altitude, autopilot mode, and body with latitude and longitude (from ArchHUD's `planet`), under busted and luacheck. Frames go out through `print` until ADR-0001. Fuel comes from ArchHUD's global tank lists, with the masses read the way its HUD reads them. Still to come: the cargo collector and the transports.
 
 ### 5. Companion (`companion/`, Python 3.12)
 
@@ -206,7 +206,7 @@ Transport adapters *(ADR-0001)*:
 - Pre-checks:
   - ArchHUD has finished setting up (`SetupComplete`);
   - no travel mode is active, and no ArchHUD route is loaded;
-  - fuel is above a threshold (not yet: needs the fuel collector);
+  - the fuel the trip needs is above a threshold (`dub.cfg.minfuel`, 10%);
   - the target body is in ArchHUD's atlas (its custom atlas, on servers that change planets).
 - Start: `ATLAS.AddNewLocation("dub-" .. job, worldPos, true)` adds the target, but selects whichever location sorts first by name, so the bus then selects its own through `AtlasOrdered` and `ATLAS.UpdateAutopilotTarget()`. A single `AP.ToggleAutopilot()` engages it, at least 2 s after the bus's previous toggle: two within 1.5 s make an orbital hop.
 - Covers same-planet travel (vector to target with altitude hold, then landing), planet-to-planet flight (launch, orbit, reentry) and space targets.

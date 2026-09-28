@@ -14,7 +14,7 @@ files["spec"] = {
     globals = { "system", "unit", "construct", "core", "dbHud_1", "PROGRAM", "VERSION_NUMBER", "AutopilotStatus",
         "Autopilot", "AltitudeHold", "BrakeIsOn", "SetupComplete", "userBase", "userScreen", "planet", "TurnBurn",
         "VectorToTarget", "spaceLaunch", "IntoOrbit", "ATLAS", "AP", "AtlasOrdered", "AutopilotTargetIndex",
-        "CustomTarget", "apRoute", "galaxyReference", "vec3" },
+        "CustomTarget", "apRoute", "galaxyReference", "vec3", "inAtmo", "atmoTanks", "spaceTanks", "rocketTanks" },
 }
 
 files["tools/simulate.lua"] = {

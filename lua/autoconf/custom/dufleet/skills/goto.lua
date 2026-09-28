@@ -17,6 +17,10 @@
 -- The default tolerances, 50 m on a planet and 1000 m in space, stand until A1 measures
 -- ArchHUD's precision. timeout (3600 s by default) counts running time, not pauses.
 -- Cancel, pause, a timeout and a failed arrival all stop the autopilot and set the brake.
+--
+-- A goto does not start (E_FUEL) when a fuel type the trip needs is under dub.cfg.minfuel
+-- (10% by default): atmo fuel while in atmosphere, space fuel in space or for a target on
+-- another body or in deep space. Types the ship has no tanks for are not checked.
 
 local M = { phase = "engage" }
 
@@ -55,6 +59,24 @@ local function parsePos(text)
     return { systemId, bodyId, fields[3], fields[4], fields[5] }
 end
 
+-- The first fuel type the trip needs that is under env.minFuel, as a message, or nil.
+local function lowFuel(env, bodyId)
+    local min = env.minFuel or 0
+    local fuel = min > 0 and env.fuel and env.fuel()
+    if not fuel then return nil end
+    local inAtmo, here = env.ah.inAtmosphere(), env.ah.body()
+    local needs = {}
+    if inAtmo then needs[#needs + 1] = "atmo" end
+    if not inAtmo or bodyId == 0 or (here and here.id ~= bodyId) then needs[#needs + 1] = "space" end
+    for _, kind in ipairs(needs) do
+        if fuel[kind] and fuel[kind] < min then
+            return string.format("%s fuel %d%%, under the %d%% minimum", kind, math.floor(fuel[kind] * 100 + 0.5),
+                math.floor(min * 100 + 0.5))
+        end
+    end
+    return nil
+end
+
 function M.check(params, env)
     for k in pairs(params) do
         if not KEYS[k] then return nil, "E_ARGS", "unknown parameter " .. k end
@@ -75,6 +97,8 @@ function M.check(params, env)
     if busy then return nil, "E_STATE", busy end
     local world, center = env.ah.worldFromMap(table.unpack(pos))
     if not world then return nil, "E_STATE", center end
+    local low = lowFuel(env, pos[2])
+    if low then return nil, "E_FUEL", low end
     return { world = world, center = pos[2] ~= 0 and center or nil, tol = tol, timeout = timeout }
 end
 

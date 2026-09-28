@@ -126,6 +126,39 @@ function M.body()
     return { id = math.tointeger(p.id) or p.id, systemId = p.systemId, center = c, radius = p.radius }
 end
 
+-- ArchHUD's fuel tank lists, one entry per tank: { id, name, max fuel mass (kg), empty mass
+-- (kg), ... } (baseclass.lua:267-281,333-343; hudclass.lua:2186-2192 names the positions).
+-- ArchHUD fills them at start while its fuel display is on (fuelX and fuelY not 0, the default).
+local TANKS = { atmo = "atmoTanks", space = "spaceTanks", rocket = "rocketTanks" }
+
+-- Fuel left per type, as a fraction of the capacity of all tanks of that type, the way
+-- ArchHUD computes a tank's percentage (hudclass.lua:2315-2330): { atmo = 0.82, ... }.
+-- Types without tanks are left out; nil when ArchHUD lists no tanks. elementMass(id) gives
+-- an element's current mass.
+function M.fuel(elementMass)
+    local out
+    for kind, name in pairs(TANKS) do
+        local tanks = G[name]
+        local fuel, capacity = 0, 0
+        for _, tank in ipairs(type(tanks) == "table" and tanks or {}) do
+            local mass, max, empty = elementMass(tank[1]), tank[3], tank[4]
+            if type(mass) == "number" and type(max) == "number" and type(empty) == "number" and max > 0 then
+                fuel, capacity = fuel + math.max(0, mass - empty), capacity + max
+            end
+        end
+        if capacity > 0 then
+            out = out or {}
+            out[kind] = math.min(1, fuel / capacity)
+        end
+    end
+    return out
+end
+
+-- Whether ArchHUD counts the ship as in atmosphere (its inAtmo, set on every tick).
+function M.inAtmosphere()
+    return G.inAtmo == true
+end
+
 -- Flying for goto (skills/goto.lua), the way a pilot does it: select a target, then
 -- toggle the autopilot once (docs/verification.md, ArchHUD addendum).
 

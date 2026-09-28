@@ -24,13 +24,19 @@ local SKILLS = { ["goto"] = require("autoconf/custom/dufleet/skills/goto") }
 
 local M = { VERSION = "0.1.0", TIMER = "dub" }
 
--- Settings, overridable with `db set dub.cfg.<name> <value>`; read at start.
-M.DEFAULTS = { tick = 0.25, maxline = P.MAXLINE_DEFAULT, lines = 2, telemetry = 1 }
-local LIMITS = { tick = { 0.05, 5 }, maxline = { 64, 12800 }, lines = { 1, 20 }, telemetry = { 0.25, 60 } }
+-- Settings, overridable with `db set dub.cfg.<name> <value>`; read at start. minfuel is the
+-- fuel fraction a goto needs to start (0 turns the check off).
+M.DEFAULTS = { tick = 0.25, maxline = P.MAXLINE_DEFAULT, lines = 2, telemetry = 1, minfuel = 0.1 }
+local LIMITS = { tick = { 0.05, 5 }, maxline = { 64, 12800 }, lines = { 1, 20 }, telemetry = { 0.25, 60 },
+    minfuel = { 0, 1 } }
 local INTEGERS = { maxline = true, lines = true }
 
 local function round1(x)
     return math.floor(x * 10 + 0.5) / 10
+end
+
+local function round3(x)
+    return math.floor(x * 1000 + 0.5) / 1000
 end
 
 local function round4(x)
@@ -136,6 +142,11 @@ function Bus:sendTelemetry()
     if speed then t.v = round1(speed * 3.6) end
     local alt = game.altitude()
     if alt then t.alt = round1(alt) end
+    local fuel = adapter.fuel(game.elementMass)
+    if fuel then
+        for kind, f in pairs(fuel) do fuel[kind] = round3(f) end
+        t.fuel = fuel
+    end
     self.outbox:push("T", jsonenc.encode(t))
 end
 
@@ -147,7 +158,8 @@ function Bus:start()
     self.cfg = self:config()
     self.outbox = outbox.new()
     self.runtime = runtime.new({ store = self.store, outbox = self.outbox, skills = SKILLS,
-        env = { ah = adapter, now = game.now, position = game.position, speed = M.speed },
+        env = { ah = adapter, now = game.now, position = game.position, speed = M.speed,
+            fuel = function() return adapter.fuel(game.elementMass) end, minFuel = self.cfg.minfuel },
         log = function(msg) self:debug(msg) end })
     self.handlers = builtins.install({}, {
         store = self.store,

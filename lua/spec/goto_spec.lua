@@ -126,6 +126,29 @@ describe("goto", function()
         assert.are.same({}, h.toggles)
     end)
 
+    it("does not start with too little of the fuel the trip needs", function()
+        local h = startBus()
+        _G.atmoTanks, _G.spaceTanks = { { 101, "a", 1000, 50 } }, { { 201, "s", 1000, 50 } }
+        h.coreMock.elements[101], h.coreMock.elements[201] = { mass = 80 }, { mass = 1050 }
+        local kind, body = h.send("run", "goto", "j_1", POS)
+        assert.are.same({ "N", "E_FUEL", "atmo fuel 3%, under the 10% minimum" }, { kind, body.err, body.msg })
+        h.coreMock.elements[101], h.coreMock.elements[201] = { mass = 1050 }, { mass = 80 }
+        assert.are.equal("A", (h.send("run", "goto", "j_2", POS))) -- on this planet: no space fuel needed
+        h.send("cancel")
+        kind, body = h.send("run", "goto", "j_3", "pos=0,0,1,2,3") -- deep space
+        assert.are.same({ "N", "E_FUEL", "space fuel 3%, under the 10% minimum" }, { kind, body.err, body.msg })
+        assert.are.same({ "dub-j_2" }, h.added)
+    end)
+
+    it("skips the fuel check when dub.cfg.minfuel is 0", function()
+        local db = databank()
+        db.data["dub.cfg.minfuel"] = "0"
+        local h = startBus({ dbMock = db })
+        _G.atmoTanks = { { 101, "a", 1000, 50 } }
+        h.coreMock.elements[101] = { mass = 50 }
+        assert.are.equal("A", (h.send("run", "goto", "j_1", POS)))
+    end)
+
     it("runs one job at a time", function()
         local h = startBus()
         h.flySpeed = 0
@@ -189,7 +212,7 @@ describe("goto", function()
 
     it("measures in straight lines in space, with a wider default tolerance", function()
         local h = startBus()
-        h.inAtmo, h.flySpeed, h.miss = false, 5000000, { 600, 0, 0 }
+        _G.inAtmo, h.flySpeed, h.miss = false, 5000000, { 600, 0, 0 }
         h.send("run", "goto", "j_1", "pos=0,0,2000000,3000000,-4000000")
         assert.are.equal("Space", _G.CustomTarget.planetname)
         assert.is_true(_G.Autopilot)

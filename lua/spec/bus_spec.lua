@@ -97,6 +97,17 @@ describe("bus", function()
         assert.is_nil(t.g)
     end)
 
+    it("reports fuel per type from the tanks ArchHUD found", function()
+        local h = startBus()
+        _G.atmoTanks = { { 101, "atmo 1", 1000, 50 }, { 102, "atmo 2", 1000, 50 } } -- id, name, max fuel, empty
+        _G.spaceTanks = { { 201, "space 1", 3000, 200 } }
+        h.coreMock.elements[101] = { mass = 850 }
+        h.coreMock.elements[102] = { mass = 50 }
+        h.coreMock.elements[201] = { mass = 3200 }
+        h.tick(1)
+        assert.are.same({ atmo = 0.4, space = 1 }, h.ofKind("T")[1].body.fuel)
+    end)
+
     it("computes latitude and longitude as ArchHUD does", function()
         local bus = require("autoconf/custom/dufleet/bus")
         local body = { center = { 0, 0, 0 } }
