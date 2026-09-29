@@ -16,7 +16,7 @@ Session 1 ran on 2026-09-28 on the owner's PC: Windows 11, one 2560×1600 monito
 | S3 | Mostly failed | Only 2 of 9 typed lines reached the Lua chat |
 | S4 | Unclear | Same run: which of the unicode, scan code and virtual key modes delivered is unknown |
 | S10 | Pass, short run | At most about 12% of the 1,000,000-instruction limit |
-| S12 | Not run | Does the bus reach the unit and core through ArchHUD's `Nav`, and the databank through ArchHUD's class constructors? Step 12 answers it: an `H` frame arrives, and no `D` frame says "no databank" |
+| S12 | Pass | In game the bus reaches the unit and the core through ArchHUD's `Nav`, and the databank through ArchHUD's class constructors |
 | S5, S6, S7 | Later: Phase 3 and `mine_loop` | |
 
 A question about DU behaviour that neither the Codex nor du-mocks answers gets a new row here, with an ID, before any code relies on an answer.
@@ -80,6 +80,16 @@ A question about DU behaviour that neither the Codex nor du-mocks answers gets a
 - Only 2 of the 9 lines arrived: the panel's "/b lines" went from 17 to 19, the last a 9-character `ping`. "passed to ArchHUD" stayed at 5, so the other 7 never reached the Lua chat. Which modes delivered, and where the other keystrokes went, is unknown. Keep the ship parked with the brake on during injector tests.
 - Next time: one mode at a time, slower typing, and a check of the panel after each line.
 - Not run: the length sweep, menus, tab persistence. Chat is no longer the command path ([ADR-0001](adr/0001-transports.md)); these matter for login and UI work.
+
+### S12 and step 12: the real bus in game (later on 2026-09-28)
+
+- The bus, fixed for the module environment, started on the first try. Its `T` frames carried altitude and fuel per type, which come from the core through `Nav.core`, once a second on its own timer, which it set through `Nav.control`.
+- `setid hauler-1` and `db set dub.cfg.telemetry 60` survived a seat restart: the bot id stayed `hauler-1`, and telemetry dropped to once a minute. The databank caught from ArchHUD's constructors works.
+- `goto j_1`, about 1.8 km on Alioth, landed 4.2 m from its target, by the bus's own position of the ship. The owner released the brake and throttled up by hand.
+- The bus had not done that. On the ground, ArchHUD's autopilot starts an auto takeoff that holds the brake (`BrakeIsOn = "ATO Hold"`) until the pilot throttles up and releases it. So `j_2` and `j_4` engaged (`engage`, then `travel`) and waited. Fixed since: the adapter throttles up and releases the hold ([verification.md](verification.md#addendum-archhud)).
+- `j_2`, pasted again after a seat restart, got its stored reply back: the bus never runs a command number twice. A retry needs a new number.
+- One `T` line a second makes the Lua chat, which scrolls to the end on every line, unreadable. `db set dub.cfg.telemetry 60` fixed that for the session.
+- Not tested yet: a `goto` that takes off by itself, and `cancel` in flight.
 
 ### S10: instruction headroom
 

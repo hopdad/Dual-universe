@@ -33,7 +33,7 @@ The fake ArchHUD in the specs hides the handler slots the same way, and luacheck
 
 ## Tests
 
-Needs Lua 5.3 (the game runs 5.4; the code must run on both), [busted](https://lunarmodules.github.io/busted/), luacheck and dkjson (`luarocks install busted luacheck dkjson`, or the distribution packages).
+Needs Lua 5.3 or 5.4 (the game runs 5.4; CI runs the specs on both), [busted](https://lunarmodules.github.io/busted/), luacheck and dkjson (`luarocks install busted luacheck dkjson`, or the distribution packages).
 
 ```sh
 cd lua

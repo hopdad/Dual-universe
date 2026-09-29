@@ -182,12 +182,14 @@ Sit back in the seat. The bus should say hello with an `@@DUB|1|...|H|...` line 
 
 ```
 cd companion
+uv run dufleet cmd db set dub.cfg.telemetry 60
 uv run dufleet cmd ping
 uv run dufleet cmd setid hauler-1
 uv run dufleet cmd status
 ```
 
 Paste each printed line into the Lua chat.
+- The first one slows telemetry from once a second to once a minute. The chat scrolls to the end on every line, so at once a second the replies are hard to read. It takes effect after you stand up and sit back down.
 - Each line gets an `@@DUB|1|...|A|...` reply.
 - `status` is also followed by `H` and `T` frames.
 - `dufleet cmd` counts cseq up by itself. If the bus answers `E_STATE` ("superseded"), its databank already holds a later cseq: add `--epoch 2`.
@@ -202,7 +204,7 @@ If A1 showed that ArchHUD flies on the server, you can also try a `goto`:
    uv run dufleet cmd run goto j_1 pos=0,2,35.3951,104.1187,285.5413
    ```
 
-3. Paste the line and keep your hands off the controls. Expect:
+3. Paste the line and keep your hands off the controls. From the ground, the bus throttles up and releases ArchHUD's takeoff brake hold itself, as a pilot would. Expect:
    - an `A` with `"job":"j_1"`;
    - `E` frames going `idle` to `engage` to `travel` to `settle`;
    - an `R` once the ship has landed and stood still for 5 s.

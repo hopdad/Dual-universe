@@ -66,6 +66,9 @@ same commit):
   calls within 1.5 s in atmosphere mean "orbital hop". Never add a location name twice (ArchHUD's replace path
   table.remove()s its body-id keyed atlas). A loaded apRoute takes precedence over the selected target.
 - Stop = AP.clearAll(), AP.cmdThrottle(0), then AP.BrakeToggle() only if BrakeIsOn is unset (strings count as set).
+- From the ground, ToggleAutopilot starts an auto takeoff that holds the brake (BrakeIsOn = "ATO Hold") until the
+  pilot throttles up and releases it; nothing in ArchHUD releases it. The adapter's engage does both
+  (cmdThrottle(1), then BrakeToggle(), which only cancels autopilots when it sets the brake). Verified 2026-09-28.
 - Handler errors print but do not stop the unit; a CPU overload does. ArchHUD runs a 60 Hz autopilot timer and a
   15 Hz HUD tick.
 - ArchHUD writes only its own keys to dbHud_1 and never clears it. Our keys use the "dub." prefix there.
@@ -80,7 +83,7 @@ Game files:
 ## Stack and conventions
 - lua/:
   - Plain Lua modules for dufleet/ plus the userclass.lua shim; no DU-LuaC project. The game runs 5.4 and
-    CI tests on 5.3, so write code that runs on both.
+    CI runs the specs on both.
   - All ArchHUD access goes through dufleet/archhud_adapter. Every entry point runs in pcall.
   - Timers only; no bot work in onUpdate/onFlush.
   - Tests: busted + du-mocks + a fake-ArchHUD harness, plus a contract spec against the real pinned ArchHUD

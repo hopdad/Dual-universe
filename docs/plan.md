@@ -314,7 +314,7 @@ Done on 2026-09-28:
 **You**
 
 1. Answer the open questions above. For the hub (question 1), a Supabase project of its own is the simplest choice.
-2. Step 12 of [spikes/README.md](../spikes/README.md): the real bus by hand, then a short `goto` on the same planet, with a `cancel` mid-flight. It also answers S12: whether the bus reaches the unit, core and databank in game.
+2. Step 12 of [spikes/README.md](../spikes/README.md), again: a `goto` that now takes off by itself, then a `cancel` mid-flight. On 2026-09-28 the bus ran in game (S12), and `j_1` landed 4.2 m from its target after you released the brake by hand. The fix for that is in.
 
 **Claude**
 
@@ -325,7 +325,7 @@ Done on 2026-09-28:
    - every shim hook under `pcall`;
    - a test harness that hides the handler slots.
 
-   Still to do: run the Lua suites on 5.4 as well as 5.3.
+   CI runs the Lua specs on 5.3 and on 5.4, the game's version.
 4. Build the chosen transports behind `dufleet.transport`, with the session's fixtures ([spikes/fixtures/2026-09-28/](../spikes/fixtures/2026-09-28/)): the frame format for protocol data, the bus's `optical` and `inbox` modules, and the companion's frame reader and inbox writer.
 5. `goto`'s tolerances: A1 landed 11.5 m from its target, well inside the 50 m default. Keep `TOL_PLANET` and `TOL_SPACE` until more trips land (step 12, then Phase 2's 10 trips).
 6. Once the Supabase project exists:
