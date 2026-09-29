@@ -34,6 +34,7 @@ local function installAutopilot(h)
     vec3 = function(x, y, z) return { x = x, y = y, z = z } end
     h.added, h.replaced, h.toggles, h.hops, h.cleared, h.throttle = {}, 0, {}, 0, 0, nil
     h.flySpeed, h.miss = 2000, { 3, 4, 0 }
+    h.onGround = true -- parked; ArchHUD then starts with an auto takeoff
     inAtmo = true -- ArchHUD's own flag, as its ticks set it
 
     local function order()
@@ -91,6 +92,9 @@ local function installAutopilot(h)
             ATLAS.UpdateAutopilotTarget()
             if CustomTarget and CustomTarget.planetname ~= "Space" and inAtmo then
                 VectorToTarget, AltitudeHold = true, true
+                -- apclass.lua:733-747: from the ground, an auto takeoff that holds the brake until the
+                -- pilot throttles up and releases it.
+                if h.onGround then AutoTakeoff, BrakeIsOn = true, "ATO Hold" end
             else
                 Autopilot, AutopilotStatus = true, "Aligning"
             end
@@ -108,6 +112,7 @@ local function installAutopilot(h)
     -- One tick of flight toward CustomTarget while ArchHUD flies.
     function h.fly(dt)
         if h.flySpeed <= 0 or not CustomTarget or not (Autopilot or VectorToTarget) then return end
+        if BrakeIsOn == "ATO Hold" then return end -- held on the ground until the brake is released
         local p, t = h.construct.position, CustomTarget.position
         local d = { t.x - p[1], t.y - p[2], t.z - p[3] }
         local len = math.sqrt(d[1] * d[1] + d[2] * d[2] + d[3] * d[3])
@@ -117,10 +122,12 @@ local function installAutopilot(h)
             h.construct.velocity = { 0, 0, 0 }
             AP.clearAll()
             BrakeIsOn = "BL Complete"
+            h.onGround = true
         else
             h.construct.position = { p[1] + d[1] / len * step, p[2] + d[2] / len * step, p[3] + d[3] / len * step }
             h.construct.velocity = { d[1] / len * h.flySpeed, d[2] / len * h.flySpeed, d[3] / len * h.flySpeed }
             BrakeIsOn = false
+            h.onGround = false
         end
     end
 end

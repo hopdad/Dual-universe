@@ -294,6 +294,11 @@ end
 
 -- Toggles the autopilot on toward the selected target. Returns the travel mode it
 -- engaged, or nil and a reason; the caller checks canToggle first.
+--
+-- On the ground, ArchHUD starts an auto takeoff but holds the brake (BrakeIsOn = "ATO
+-- Hold", apclass.lua:733-747) until the pilot throttles up and releases the brake; nothing
+-- in ArchHUD releases it by itself. The bus does both, as the pilot would. Releasing the
+-- brake keeps the takeoff: AP.BrakeToggle only cancels the autopilots when it sets one.
 function M.engage(now)
     local ap = G.AP
     if type(ap) ~= "table" or not ap.ToggleAutopilot then return nil, "ArchHUD's AP not found" end
@@ -303,6 +308,10 @@ function M.engage(now)
     ap.ToggleAutopilot()
     local mode = M.travelling()
     if not mode then return nil, "ArchHUD's autopilot did not engage" end
+    if G.AutoTakeoff == true and G.BrakeIsOn == "ATO Hold" then
+        if ap.cmdThrottle then ap.cmdThrottle(1) end
+        if ap.BrakeToggle then ap.BrakeToggle() end
+    end
     return mode
 end
 

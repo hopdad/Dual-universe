@@ -14,7 +14,8 @@ files["spec"] = {
     std = "+busted",
     globals = { "system", "unit", "construct", "core", "dbHud_1", "DUSystem", "DUConstruct", "Nav", "AtlasClass",
         "APClass", "PROGRAM", "VERSION_NUMBER", "AutopilotStatus",
-        "Autopilot", "AltitudeHold", "BrakeIsOn", "SetupComplete", "userBase", "userScreen", "planet", "TurnBurn",
+        "Autopilot", "AltitudeHold", "AutoTakeoff", "BrakeIsOn", "SetupComplete", "userBase", "userScreen", "planet",
+        "TurnBurn",
         "VectorToTarget", "spaceLaunch", "IntoOrbit", "ATLAS", "AP", "AtlasOrdered", "AutopilotTargetIndex",
         "CustomTarget", "apRoute", "galaxyReference", "vec3", "inAtmo", "atmoTanks", "spaceTanks", "rocketTanks" },
 }

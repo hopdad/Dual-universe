@@ -70,6 +70,15 @@ describe("goto", function()
         assert.are.same({ "idle" }, { last.st, last.job })
     end)
 
+    it("takes off from the ground as a pilot would: throttle up, brake off", function()
+        local h = startBus()
+        h.flySpeed = 0 -- keep the ship on the ground to look at the takeoff
+        h.send("run", "goto", "j_1", POS)
+        assert.is_true(_G.AutoTakeoff) -- ArchHUD's auto takeoff is on
+        assert.is_false(_G.BrakeIsOn) -- its brake hold is released
+        assert.are.equal(1, h.throttle) -- with the throttle up
+    end)
+
     it("selects its own location, which is not the one ArchHUD selects", function()
         local h = startBus()
         h.flySpeed = 0
@@ -226,7 +235,7 @@ describe("goto", function()
         local h = startBus()
         h.flySpeed = 0
         h.send("run", "goto", "j_1", POS)
-        _G.VectorToTarget, _G.AltitudeHold = false, false -- the construct still moves at 5 m/s
+        _G.VectorToTarget, _G.AltitudeHold, _G.AutoTakeoff = false, false, false -- the construct still moves at 5 m/s
         h.tick(4 * 29)
         assert.is_nil(h.result())
         h.tick(8)

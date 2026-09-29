@@ -77,14 +77,23 @@ describeIf("the ArchHUD adapter against ArchHUD 2.105", function()
         assert.are.same({ true, "Space" }, { adapter().selectTarget("dub-j_1", w) })
     end)
 
-    it("engages vector to target from the ground, with an auto takeoff holding the brake", function()
+    it("on the ground, ArchHUD's own toggle starts an auto takeoff that holds the brake", function()
         local h = real.install({ at = "ground" })
-        local w = adapter().worldFromMap(0, 2, 10, 20, 300)
-        adapter().selectTarget("dub-j_1", w)
+        adapter().selectTarget("dub-j_1", adapter().worldFromMap(0, 2, 10, 20, 300))
+        _G.AP.ToggleAutopilot()
+        assert.is_true(_G.VectorToTarget and _G.AltitudeHold and _G.AutoTakeoff)
+        assert.are.equal("ATO Hold", _G.BrakeIsOn) -- held until the pilot throttles up and releases it
+        assert.is_not.equal(1, h.throttle)
+    end)
+
+    it("engages from the ground and releases that hold as a pilot would", function()
+        local h = real.install({ at = "ground" })
+        adapter().selectTarget("dub-j_1", adapter().worldFromMap(0, 2, 10, 20, 300))
         assert.are.equal("VectorToTarget", adapter().engage(h.clock))
         assert.is_true(_G.AltitudeHold)
-        assert.is_true(_G.AutoTakeoff)
-        assert.are.equal("ATO Hold", _G.BrakeIsOn)
+        assert.is_true(_G.AutoTakeoff) -- the takeoff is still on
+        assert.is_false(_G.BrakeIsOn) -- the brake is released
+        assert.are.equal(1, h.throttle) -- and the throttle is up
         assert.is_false(_G.Autopilot)
     end)
 
@@ -96,18 +105,18 @@ describeIf("the ArchHUD adapter against ArchHUD 2.105", function()
         assert.is_false(_G.VectorToTarget)
     end)
 
-    it("stops everything and keeps the brake set", function()
+    it("stops everything and sets the brake, leaving a set brake alone", function()
         local h = real.install({ at = "ground" })
         adapter().selectTarget("dub-j_1", adapter().worldFromMap(0, 2, 10, 20, 300))
         adapter().engage(h.clock)
         assert.is_true(adapter().stop())
         assert.is_nil(adapter().travelling())
         assert.is_false(_G.AltitudeHold)
-        assert.are.equal("ATO Hold", _G.BrakeIsOn) -- a string brake stays set: BrakeToggle would release it
-        assert.are.equal(0, h.throttle)
-        _G.BrakeIsOn = false
-        adapter().stop()
         assert.is_true(_G.BrakeIsOn)
+        assert.are.equal(0, h.throttle)
+        _G.BrakeIsOn = "BL Complete"
+        adapter().stop()
+        assert.are.equal("BL Complete", _G.BrakeIsOn) -- a string brake stays set: BrakeToggle would release it
     end)
 
     it("would fly a loaded route instead, so the adapter refuses", function()
