@@ -138,7 +138,7 @@ Items marked *(ADR-0001)* wait for the transport decision. Everything else can s
   - The realtime publication.
   - Retention through pg_cron.
 - Run the verification scenarios in CI, as pgTAP or as the existing psql scenarios.
-- Done 2026-09-27 ([supabase/README.md](../supabase/README.md)): migrations `0001`–`0005` with all of the above, plus column-level grants, `command_progress`, `cancel_command` and `sync_epoch` (a hub that lost its numbering moves to a new epoch instead of having every command refused). 17 psql scenarios in `supabase/tests/` run on plain PostgreSQL, and deliberate mutations of the migrations make them fail.
+- Done 2026-09-27 ([supabase/README.md](../supabase/README.md)): migrations `0001`–`0005` with all of the above, plus column-level grants, `command_progress`, `cancel_command` and `sync_epoch` (a hub that lost its numbering moves to a new epoch instead of having every command refused). On 2026-09-28, `0006` added `request_resend`, and `seed/skills.sql` added the skills rows. 19 psql scenarios in `supabase/tests/` run on plain PostgreSQL, and deliberate mutations of the migrations make them fail.
 
 ### 4. Lua bus (`lua/`)
 
@@ -298,21 +298,42 @@ Answered: the server is The Third Verse, which uses its own atlas (The-Third-Ver
 
 1. Supabase: a new hosted project, an existing one, or self-hosted?
 2. Fleet size and hosts: spare PCs, Hyper-V GPU-P VMs, or cloud instances?
-3. The `Ai helper/` folder: keep it, remove it, or give it a purpose?
+3. The `Ai helper/` folder, which holds only an empty `Readme`: keep it, remove it, or give it a purpose?
 
 ## Next steps
 
-1. **You:** get the admin's written permission (S9).
-2. **You:** run the probe kit, following [spikes/README.md](../spikes/README.md). It covers S8, A1, A2, S0, S11, S1, S3, S4 and S10 in one session. At the end, paste back `results/summary.md` and the panel's lines. If there is time, optional step 12 tries the real bus by hand.
-3. **You:** decide where the hub runs (open question 1). A new Supabase project of its own is the simplest choice.
-4. **Claude:** write ADR-0001 from the results, then build the chosen transports and the companion's `run` on top of what exists.
-5. **You, after A1:** try `goto` by hand with optional step 12 of the probe kit: a short hop on the same planet, then `cancel` mid-flight.
+From here on, sessions run on your PC. [The handoff](handoff/cloud-to-local.md) covers the setup.
 
-State on 2026-09-27: the transport-independent parts of workstreams 1–6 are built and green in CI:
-- the protocol package;
-- the hub migrations;
+**You**
+
+1. Get written permission from The Third Verse's admins for client-side automation tests (S9): screen capture, and commands typed into chat or passed through a file. Nothing runs on their server before that.
+2. Get the work onto your PC. Clone the repository and switch to `claude/handoff-verification-plan-2ftwok`, or merge that branch into `main` first. Install uv (`winget install astral-sh.uv`).
+3. Run the probe kit session: steps 1 to 11 of [spikes/README.md](../spikes/README.md). It covers S8, A1, A2, S0, S11, S1, S3, S4 and S10. Bring back:
+   - `spikes\results\summary.md`;
+   - the panel's lines and the `hello` line;
+   - how the A1 trip went, including how far from the target the ship landed;
+   - what the admins agreed to.
+4. If there is time after A1, do step 12: the real bus by hand, then a short `goto` on the same planet, with a `cancel` mid-flight.
+5. Answer the open questions above. For the hub (question 1), a Supabase project of its own is the simplest choice.
+
+**Claude, in a session on your PC**
+
+6. Record the results in [spikes.md](spikes.md), write ADR-0001 (D2 and D3), and update [verification.md](verification.md).
+7. Build the chosen transports behind `dufleet.transport`, with fixtures from the session.
+8. Set `goto`'s default tolerances from what A1 measured: `TOL_PLANET` and `TOL_SPACE` in `lua/autoconf/custom/dufleet/skills/goto.lua`, and the `tol` description in `skills.json` (then run the codegen).
+9. Once the Supabase project exists:
+   - apply the migrations and the seed;
+   - set up your owner user and a device user for each bot;
+   - run the Phase 1 acceptance on one client.
+
+State on 2026-09-28: the transport-independent parts of workstreams 1–6 are built and green in CI:
+- the protocol package and the skills registry;
+- the hub migrations (`0001`–`0006`) and the skills seed;
 - the Lua bus core, with the skill runtime and `goto` (Phase 2, untested in game);
-- the companion's pump, router and Supabase client;
-- the dashboard skeleton.
+- the companion:
+  - the pump, with lost-result recovery;
+  - the router and the Supabase client;
+  - `install`, `doctor`, `run` and `sim`;
+- the dashboard.
 
 The "Done" notes under each workstream give the details.

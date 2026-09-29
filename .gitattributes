@@ -1,0 +1,5 @@
+# LF in every checkout, Windows included: the shell scripts (lua/tools/deps.sh,
+# supabase/tests/run.sh) run in bash under WSL, Git Bash and CI.
+* text=auto eol=lf
+*.ico binary
+*.png binary

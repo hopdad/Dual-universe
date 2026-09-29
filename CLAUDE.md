@@ -9,6 +9,8 @@ Client-side automation for myDU (self-hosted Dual Universe), only on servers who
 Where to look:
 - Plan and decision gates: docs/plan.md. Decisions: docs/adr/. Wire protocol: docs/protocol.md.
 - Verified facts with evidence: docs/verification.md (ArchHUD in its addendum).
+- Todo list: "Next steps" in docs/plan.md. Spike results: docs/spikes.md.
+- Moving from the cloud sessions to the owner's PC (Windows setup, lessons learned): docs/handoff/cloud-to-local.md.
 - Original spec: docs/handoff/original-handoff.md (superseded wherever the documents above disagree).
 
 ## Hard facts (verified 2026-09-26; do not re-litigate)
