@@ -69,6 +69,11 @@ same commit):
 - From the ground, ToggleAutopilot starts an auto takeoff that holds the brake (BrakeIsOn = "ATO Hold") until the
   pilot throttles up and releases it; nothing in ArchHUD releases it. The adapter's engage does both
   (cmdThrottle(1), then BrakeToggle(), which only cancels autopilots when it sets the brake). Verified 2026-09-28.
+- In the air, vector to target releases the brake itself but waits for the pilot's throttle: engage throttles up
+  when it is 0 (after a cancel or pause). In space the autopilot stops AutopilotSpaceDistance (5000 m by default)
+  short of a custom target (apclass.lua:1853); goto's tol counts beyond that.
+- ArchHUD's user manual, read 2026-09-29: bot-relevant notes in docs/archhud-manual-notes.md (hints; the source
+  decides).
 - Handler errors print but do not stop the unit; a CPU overload does. ArchHUD runs a 60 Hz autopilot timer and a
   15 Hz HUD tick.
 - ArchHUD writes only its own keys to dbHud_1 and never clears it. Our keys use the "dub." prefix there.

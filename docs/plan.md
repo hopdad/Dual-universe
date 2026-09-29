@@ -314,7 +314,7 @@ Done on 2026-09-28:
 **You**
 
 1. Answer the open questions above. For the hub (question 1), a Supabase project of its own is the simplest choice.
-2. Step 12 of [spikes/README.md](../spikes/README.md), again: a `goto` that now takes off by itself, then a `cancel` mid-flight. On 2026-09-28 the bus ran in game (S12), and `j_1` landed 4.2 m from its target after you released the brake by hand. The fix for that is in.
+2. Step 12 of [spikes/README.md](../spikes/README.md), again: a `goto` that takes off by itself, a `cancel` mid-flight, then a `goto` from the air. On 2026-09-28 the bus ran in game (S12), and `j_1` landed 4.2 m from its target after you released the brake by hand. The fixes for that, and for a start in the air, are in.
 
 **Claude**
 
@@ -333,6 +333,7 @@ Done on 2026-09-28:
    - set up your owner user and a device user for each bot;
    - run the Phase 1 acceptance on one client.
 7. Before login and UI work: repeat S3 and S4 one mode at a time, typing more slowly (session 1 delivered 2 of 9 lines).
+8. From ArchHUD's user manual ([notes](archhud-manual-notes.md)): refuse `goto` targets on moons and asteroids, consider a lower `AutoTakeoffAltitude` for short trips, and report why a trip ended early when ArchHUD's collision system or PvP guard stopped it.
 
 State on 2026-09-28: the transport-independent parts of workstreams 1–6 are built and green in CI:
 - the protocol package and the skills registry;
