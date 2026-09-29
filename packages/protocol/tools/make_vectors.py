@@ -366,7 +366,7 @@ def main(argv: list[str] | None = None) -> int:
         print(f"out of date: {OUT.relative_to(ROOT)}", file=sys.stderr)
         print("run: cd companion && uv run python ../packages/protocol/tools/make_vectors.py", file=sys.stderr)
         return 1
-    OUT.write_text(text, encoding="utf-8")
+    OUT.write_text(text, encoding="utf-8", newline="\n")  # LF on Windows too (.gitattributes)
     print(f"wrote {OUT.relative_to(ROOT)}")
     return 0
 
