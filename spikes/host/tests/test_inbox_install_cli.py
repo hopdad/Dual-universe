@@ -77,6 +77,28 @@ def test_probe_and_bus_together_are_refused(tmp_path):
         install.run(args)
 
 
+def test_install_stops_before_writing_when_a_file_cannot_be_replaced(tmp_path, capsys):
+    lua, custom = _lua_tree(tmp_path)
+    theirs = custom / "archhud" / "userclass.lua"
+    theirs.write_text("-- copied in by an administrator\n", encoding="utf-8")
+    os.chmod(theirs, 0o444)  # read-only for this account, as Administrators' files in ProgramData are
+    try:
+        if install._replaceable(theirs):
+            pytest.skip("this account can write read-only files")
+        args = Namespace(lua_dir=str(lua), archhud=None, atlas=None, probe=True, bus=False, uninstall_probe=False,
+                         no_verify=False, apply=False, results=tmp_path / "results")
+        install.run(args)  # the dry run warns
+        out = capsys.readouterr().out
+        assert "cannot replace: archhud/userclass.lua" in out and "icacls" in out
+        args.apply = True
+        with pytest.raises(SystemExit):
+            install.run(args)
+        assert not (custom / "dufleet").exists()
+        assert not list(custom.rglob("*.dufleet-tmp"))
+    finally:
+        os.chmod(theirs, 0o644)
+
+
 def test_uninstall_keeps_a_userclass_that_is_not_ours(tmp_path):
     lua, custom = _lua_tree(tmp_path)
     own = custom / "archhud" / "userclass.lua"

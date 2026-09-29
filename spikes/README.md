@@ -49,6 +49,7 @@ uv run dufleet-probe install --archhud fetch --atlas fetch --probe --apply
 ```
 
 - The first command is a dry run and only lists what would change. The second one writes.
+- If it says this account cannot replace files there, run the `icacls` line it prints once, in an administrator terminal. Files copied into the game folder through a UAC prompt belong to Administrators.
 - `fetch` downloads The-Third-Verse/ArchHUD 2.105 (commit `6c95222`) and The Third Verse's `atlas.lua` (commit `48dd00f`). The installer refuses them if their SHA-256 doesn't match the pins.
 - If `paths` already said "11/11 files match" and "atlas: pinned", you only need `--probe`.
 - If you already had your own `archhud\userclass.lua`, it goes to `autoconf\custom\_dufleet_backup\`, and step 11 puts it back.

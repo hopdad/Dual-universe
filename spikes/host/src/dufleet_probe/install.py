@@ -106,6 +106,31 @@ def bus_files_to_write() -> list[Write]:
     return [Write(rel, (BUS_SOURCE / rel).read_bytes(), "lua/") for rel in bus_files()]
 
 
+def _replaceable(path: Path) -> bool:
+    """Whether this account may overwrite an existing file."""
+    try:
+        with open(path, "ab"):
+            return True
+    except PermissionError:
+        return False
+
+
+def blocked_files(custom: Path, writes: list[Write]) -> list[str]:
+    """Existing files the install would replace but this account cannot. On Windows, files
+    copied into ProgramData through a UAC prompt belong to Administrators and are
+    read-only for users, while new files may still be created next to them."""
+    return [w.rel for w in writes
+            if (custom / w.rel).is_file() and sha256_file(custom / w.rel) != sha256_bytes(w.data)
+            and not _replaceable(custom / w.rel)]
+
+
+def permission_help(custom: Path) -> str:
+    user = os.environ.get("USERNAME") or os.environ.get("USER") or "<your account>"
+    return (f"This account cannot replace files in {custom}.\n"
+            "Once, in an administrator terminal, give it Modify rights on that folder:\n"
+            f'  icacls "{custom}" /grant "{user}:(OI)(CI)M"')
+
+
 def apply_writes(custom: Path, writes: list[Write], stamp: str, dry_run: bool) -> dict:
     report: dict[str, list[str]] = {"written": [], "unchanged": [], "backed_up": []}
     backup_root = custom / BACKUP_DIR / stamp
@@ -125,7 +150,11 @@ def apply_writes(custom: Path, writes: list[Write], stamp: str, dry_run: bool) -
             dest.parent.mkdir(parents=True, exist_ok=True)
             tmp = dest.with_name(dest.name + ".dufleet-tmp")
             tmp.write_bytes(w.data)
-            os.replace(tmp, dest)
+            try:
+                os.replace(tmp, dest)
+            except OSError:
+                tmp.unlink(missing_ok=True)
+                raise
     return report
 
 
@@ -170,6 +199,21 @@ def run(args) -> int:
         raise SystemExit(f"{custom} does not exist; is --lua-dir right?")
     dry_run = not args.apply
     result: dict = {"lua_dir": str(lua), "dry_run": dry_run}
+    try:
+        _run(args, custom, dry_run, result)
+    except PermissionError as exc:
+        raise SystemExit(f"{exc}\n{permission_help(custom)}") from None
+    for section in ("install", "uninstall"):
+        for key, items in result.get(section, {}).items():
+            for item in items:
+                print(f"  {key:10} {item}")
+    save_json(args.results, "install.json", result)
+    if dry_run:
+        print("Dry run: nothing was written. Add --apply to do it.")
+    return 0
+
+
+def _run(args, custom: Path, dry_run: bool, result: dict) -> None:
     if args.uninstall_probe:
         result["uninstall"] = uninstall_probe(custom, dry_run)
     else:
@@ -186,15 +230,13 @@ def run(args) -> int:
             writes += bus_files_to_write()
         if not writes:
             raise SystemExit("Nothing to do: pass --archhud, --atlas, --probe, --bus or --uninstall-probe")
+        blocked = blocked_files(custom, writes)
+        if blocked:
+            print(permission_help(custom))
+            print("  cannot replace: " + ", ".join(blocked))
+            if not dry_run:
+                raise SystemExit("Nothing was written.")
         result["install"] = apply_writes(custom, writes, time.strftime("%Y%m%d-%H%M%S"), dry_run)
-    for section in ("install", "uninstall"):
-        for key, items in result.get(section, {}).items():
-            for item in items:
-                print(f"  {key:10} {item}")
-    save_json(args.results, "install.json", result)
-    if dry_run:
-        print("Dry run: nothing was written. Add --apply to do it.")
-    return 0
 
 
 def add_parser(sub) -> None:
