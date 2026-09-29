@@ -65,6 +65,8 @@ sudo update-alternatives --set lua-interpreter /usr/bin/lua5.3
 
 CI runs every suite on each push, so a push covers whatever the PC cannot run.
 
+With Docker Desktop running, `tools/local-ci/run.sh` runs CI's Lua and Python jobs on the PC, in Linux containers: busted on Lua 5.3 and 5.4, luacheck, and the companion's tests against PostgreSQL 16 with the real Lua bus. `tools/local-ci/run.sh lua` or `python` runs one job. Unlike CI, it shows the full output of a failure.
+
 `.gitattributes` keeps LF line endings in Windows checkouts, so the shell scripts also work from Git Bash and from WSL. That holds for a fresh clone; a checkout made before that file existed keeps its old line endings until you re-clone.
 
 ## Lessons from these sessions
