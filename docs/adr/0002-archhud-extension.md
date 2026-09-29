@@ -38,5 +38,5 @@
 - Every bot host needs ArchHUD and the bus installed at the pinned versions. The companion's `doctor` command checks file hashes.
 - Amended 2026-09-28, from the first in-game run ([verification.md](../verification.md#addendum-in-game-2026-09-28)):
   - The game runs Lua 5.4, so the bus must run on 5.4 as well as 5.3.
-  - Files loaded with `require` cannot see the handler slots (`system`, `unit`, `core`, `dbHud_1`, ...). The bus reaches the game through `DUSystem` and `DUConstruct`, and the unit and core through ArchHUD's global `Nav`.
+  - Files loaded with `require` cannot see the handler slots (`system`, `unit`, `core`, `dbHud_1`, ...). The bus reaches the game through `DUSystem` and `DUConstruct`, the unit and core through ArchHUD's global `Nav`, and the databank by wrapping ArchHUD's `AtlasClass` and `APClass` constructors when the shim loads.
   - An error escaping a `userBase.ExtraOn*` hook stops ArchHUD's startup, so the shim runs every hook under `pcall`.

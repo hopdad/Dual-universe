@@ -1,5 +1,12 @@
--- The game API calls the bus makes (system, unit, construct, core), in one place so the
--- tests can replace them. Each returns nil when the element or call is missing.
+-- The game API calls the bus makes, in one place so the tests can replace them. Each
+-- returns nil when the element or call is missing.
+--
+-- Files loaded with require cannot see the handler slots (system, unit, construct, core,
+-- ...). The system and construct APIs are the globals DUSystem and DUConstruct, as
+-- ArchHUD's own classes use them; the unit and the core come from ArchHUD (its global
+-- Nav, through archhud_adapter).
+
+local adapter = require("autoconf/custom/dufleet/archhud_adapter")
 
 local M = {}
 
@@ -10,41 +17,51 @@ local function vec(v)
     return nil
 end
 
+local function unit()
+    local u = adapter.unit()
+    if not u then error("the control unit is not reachable (ArchHUD's Nav.control)") end
+    return u
+end
+
 function M.now()
-    return system.getUtcTime()
+    return DUSystem.getUtcTime()
 end
 
 function M.print(s)
-    system.print(s)
+    DUSystem.print(s)
 end
 
 function M.setTimer(tag, period)
-    unit.setTimer(tag, period)
+    unit().setTimer(tag, period)
 end
 
 function M.stopTimer(tag)
-    unit.stopTimer(tag)
+    unit().stopTimer(tag)
 end
 
 function M.constructId()
+    local construct = DUConstruct
     if construct and construct.getId then return math.tointeger(construct.getId()) end
     return nil
 end
 
 -- World position of the construct, metres.
 function M.position()
+    local construct = DUConstruct
     if construct and construct.getWorldPosition then return vec(construct.getWorldPosition()) end
     return nil
 end
 
 -- World velocity relative to the parent body, m/s.
 function M.velocity()
+    local construct = DUConstruct
     if construct and construct.getWorldVelocity then return vec(construct.getWorldVelocity()) end
     return nil
 end
 
 -- Mass of one of the construct's elements, kg.
 function M.elementMass(id)
+    local core = adapter.core()
     if core and core.getElementMassById then
         local m = core.getElementMassById(id)
         if type(m) == "number" then return m end
@@ -54,6 +71,7 @@ end
 
 -- Altitude above sea level of the nearest planet, metres; 0 in space.
 function M.altitude()
+    local core = adapter.core()
     if core and core.getAltitude then
         local a = core.getAltitude()
         if type(a) == "number" then return a end

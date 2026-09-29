@@ -30,6 +30,7 @@ M.TOGGLE_GAP = 2
 local G = _ENV
 local hooked
 local lastToggle
+local databank -- the databank ArchHUD hands its class constructors (see watchConstructors)
 
 local function set(v)
     return v ~= nil and v ~= false
@@ -49,7 +50,53 @@ function M.problem()
     if type(prog) ~= "table" then return "ArchHUD's PROGRAM table not found" end
     if type(prog.controlInput) ~= "function" then return "ArchHUD's PROGRAM.controlInput not found" end
     if type(prog.onTick) ~= "function" then return "ArchHUD's PROGRAM.onTick not found" end
+    if not M.unit() then return "ArchHUD's Nav.control (the control unit) not found" end
     return nil
+end
+
+-- Files loaded with require cannot see the handler slots (unit, core, dbHud_1, ...).
+-- ArchHUD.conf keeps the unit and the core in its global Nav = Navigator.new(system, core,
+-- unit), which stores them as Nav.control and Nav.core (the game's Navigator.lua).
+local function nav(field)
+    local n = G.Nav
+    if type(n) ~= "table" then return nil end
+    local v = n[field]
+    local t = type(v)
+    if t == "table" or t == "userdata" then return v end
+    return nil
+end
+
+-- The control unit, or nil.
+function M.unit()
+    return nav("control")
+end
+
+-- The core unit, or nil.
+function M.core()
+    return nav("core")
+end
+
+-- ArchHUD passes its dbHud_1 slot only to its class constructors, during setup and before
+-- ExtraOnStart: AtlasClass as argument 5 and APClass as argument 9 (baseclass.lua:527,552).
+-- Both are globals that ArchHUD looks up when it calls them, so wrapping them when the
+-- userclass shim loads, before setup runs, keeps the databank for M.databank.
+function M.watchConstructors()
+    local function keep(db)
+        if databank == nil and db ~= nil then databank = db end
+    end
+    local atlasClass, apClass = G.AtlasClass, G.APClass
+    if type(atlasClass) == "function" then
+        G.AtlasClass = function(...)
+            keep((select(5, ...)))
+            return atlasClass(...)
+        end
+    end
+    if type(apClass) == "function" then
+        G.APClass = function(...)
+            keep((select(9, ...)))
+            return apClass(...)
+        end
+    end
 end
 
 function M.version()
@@ -91,9 +138,9 @@ function M.unhook()
     end
 end
 
--- The databank linked on ArchHUD's dbHud_1 slot, or nil.
+-- The databank linked on ArchHUD's dbHud_1 slot, as its constructors received it, or nil.
 function M.databank()
-    local db = G.dbHud_1
+    local db = databank
     local t = type(db)
     if (t == "table" or t == "userdata") and db.getStringValue and db.setStringValue and db.hasKey then
         return db

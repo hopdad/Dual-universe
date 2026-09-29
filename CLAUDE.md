@@ -28,7 +28,9 @@ In game (verified 2026-09-28, session 1; docs/verification.md, "Addendum: in gam
 - Files loaded with require (all of dufleet/ and archhud/) do not see the handler slots: system, unit, core,
   dbHud_1 and other linked elements are nil there. Use DUSystem (also DUPlayer, DUConstruct, DULibrary), as
   ArchHUD's classes do. Globals set by handler code (PROGRAM, script, Nav) are visible. The unit arrives only
-  as an argument: ArchHUD.conf's tick handler calls script.onTick(timerId, unit).
+  as an argument: ArchHUD.conf's tick handler calls script.onTick(timerId, unit). ArchHUD keeps the unit and core
+  in its global Nav (Nav.control, Nav.core) and passes the databank only to its constructors, AtlasClass (arg 5)
+  and APClass (arg 9), during setup; the bus wraps them when the shim loads (lua/README.md).
 - An error escaping a userBase.ExtraOn* hook stops ArchHUD's startup ("ERROR STARTUP", no HUD). Run every hook
   under pcall, and report errors with a print that cannot itself throw.
 - A 0.25 s timer fires about 3.78 times per second (it waits for a rendered frame).
@@ -109,10 +111,8 @@ Game files:
 - Conventional commits. Protocol changes bump docs/protocol.md and vectors.json.
 
 ## Current phase: 1 (Phase 0's in-game session ran on 2026-09-28; docs/spikes.md, ADR-0001)
-- Next: make the bus work in game. dufleet/game.lua reads system, unit, construct and core as globals, and
-  archhud_adapter reads G.dbHud_1; all are nil for required files, but the test harness defines them. Use
-  DUSystem and DUConstruct; the unit and core are Nav.control and Nav.core (the game's Navigator.lua); the
-  databank still needs a source. Then the transports O and F ("Next steps" in plan.md).
+- The bus no longer reads the handler slots (done offline 2026-09-28; step 12 checks it in game, spike S12).
+  Next: the transports O and F ("Next steps" in plan.md).
 - The probe kit is in spikes/, with the session script in spikes/README.md. Its tests run offline:
   cd spikes/host && uv run pytest (the Lua parts need lua5.3 on PATH; they also run on Windows).
 - Pinned upstream files and their SHA-256 live in spikes/host/src/dufleet_probe/pins.py.

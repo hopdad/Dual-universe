@@ -178,7 +178,7 @@ This step is only for when you have time left after the spikes. It swaps the pro
 uv run dufleet-probe install --bus --apply
 ```
 
-Sit back in the seat. Then, in a second terminal, make command lines with correct CRCs:
+Sit back in the seat. The bus should say hello with an `@@DUB|1|...|H|...` line in the Lua chat, and no `D` line saying "no databank" (spike S12). Then, in a second terminal, make command lines with correct CRCs:
 
 ```
 cd companion

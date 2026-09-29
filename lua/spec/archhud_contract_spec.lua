@@ -132,3 +132,37 @@ describeIf("the ArchHUD adapter against ArchHUD 2.105", function()
         assert.are.equal(_G.planet.noAtmosphericDensityAltitude + _G.LowOrbitHeight, _G.HoldAltitude)
     end)
 end)
+
+-- Files loaded with require cannot see the handler slots (system, unit, core, dbHud_1), so the
+-- bus reaches them through what ArchHUD's start does with them (docs/verification.md, "Addendum:
+-- in game"). These read the pinned source, since real_archhud calls the constructors itself.
+describeIf("what the bus relies on in ArchHUD 2.105's start", function()
+    local function source(path)
+        local f = assert(io.open(real.DIR .. path))
+        local s = f:read("a")
+        f:close()
+        return s
+    end
+
+    it("builds the global Nav from the system, the core and the unit", function()
+        assert.truthy(source("src/ArchHUD.lua"):find("Nav = Navigator.new(system, core, unit)", 1, true))
+    end)
+
+    it("passes the databank to AtlasClass as argument 5 and to APClass as argument 9", function()
+        local base = source("src/requires/baseclass.lua")
+        assert.truthy(base:find("ATLAS = AtlasClass(Nav, c, u, s, dbHud_1,", 1, true))
+        assert.truthy(base:find("AP = APClass(Nav, c, u, atlas, vBooster, hover, telemeter_1, antigrav, dbHud_1,", 1,
+            true))
+    end)
+
+    it("builds both classes in its setup before it calls ExtraOnStart", function()
+        local base = source("src/requires/baseclass.lua")
+        local setup = base:find("beginSetup = coroutine.create", 1, true)
+        assert.truthy(setup)
+        local ap = base:find("AP = APClass(", setup, true)
+        local atlas = base:find("atlasSetup()", setup, true) -- atlasSetup builds ATLAS
+        local extra = base:find("PROGRAM.ExtraOnStart()", setup, true)
+        assert.truthy(ap and atlas and extra)
+        assert.is_true(ap < extra and atlas < extra)
+    end)
+end)

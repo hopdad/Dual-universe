@@ -3,6 +3,12 @@
 -- (du-mocks for the control unit, core and databank; small fakes where du-mocks leaves
 -- a call unimplemented).
 --
+-- As in the game, the bus's files cannot see the handler slots: system, unit, construct,
+-- core and dbHud_1 are not globals here. The bus finds DUSystem and DUConstruct, the unit
+-- and the core in ArchHUD's global Nav, and the databank only through the constructors
+-- ArchHUD's setup calls. h.start() replays ArchHUD's start: load the shim, run setup
+-- (AtlasClass and APClass receive the databank), then ExtraOnStart.
+--
 -- The atlas and autopilot follow atlasclass.lua and apclass.lua at 6c95222 as far as goto
 -- uses them: AddNewLocation selects whichever location sorts first, UpdateAutopilotTarget
 -- selects by AutopilotTargetIndex, and ToggleAutopilot engages only when no mode is set
@@ -123,27 +129,29 @@ function M.install(opts)
     opts = opts or {}
     local h = { printed = {}, archInputs = {}, archTicks = {}, clock = opts.clock or 1790000000.0 }
 
-    system = {
+    DUSystem = {
         print = function(s) h.printed[#h.printed + 1] = s end,
         getUtcTime = function() return h.clock end,
     }
     h.unitMock = require("dumocks.ControlUnit"):new(nil, 1, "remote controller xs")
-    unit = h.unitMock:mockGetClosure()
+    h.unit = h.unitMock:mockGetClosure()
     h.coreMock = require("dumocks.CoreUnit"):new(nil, 2, "dynamic core unit xs")
     h.coreMock.altitude = 285.54
-    core = h.coreMock:mockGetClosure()
+    h.core = h.coreMock:mockGetClosure()
     h.construct = { id = opts.constructId or 4242, position = { -123456.54, 98765.25, 42.0 }, velocity = { 3, 4, 0 } }
-    construct = {
+    DUConstruct = {
         getId = function() return h.construct.id end,
         getWorldPosition = function() return h.construct.position end,
         getWorldVelocity = function() return h.construct.velocity end,
     }
-    if opts.databank == false then
-        dbHud_1 = nil
-    else
+    if opts.databank ~= false then
         h.dbMock = opts.dbMock or require("dumocks.DatabankUnit"):new(nil, 3)
-        dbHud_1 = h.dbMock:mockGetClosure()
+        h.db = h.dbMock:mockGetClosure()
     end
+    -- The handler slots, which required files never see.
+    system, unit, construct, core, dbHud_1 = nil, nil, nil, nil, nil
+    -- ArchHUD.conf: Nav = Navigator.new(system, core, unit); the game's Navigator keeps them.
+    Nav = { core = h.core, control = h.unit }
     PROGRAM = {
         controlInput = function(text) h.archInputs[#h.archInputs + 1] = text end,
         onTick = function(id) h.archTicks[#h.archTicks + 1] = id end,
@@ -152,12 +160,30 @@ function M.install(opts)
     SetupComplete = true
     AltitudeHold, BrakeIsOn, AutopilotStatus, TurnBurn = false, false, "Aligning", false
     installAutopilot(h)
+    -- ArchHUD's class constructors, as globals its setup looks up when it calls them. The
+    -- fakes return the ATLAS and AP built above.
+    local atlas, ap = ATLAS, AP
+    AtlasClass = function() return atlas end
+    APClass = function() return ap end
     planet = nil -- ArchHUD's current body; specs set it when they need one
     userBase, userScreen = nil, nil
 
     -- Every test starts from freshly loaded bus modules.
     for name in pairs(package.loaded) do
         if name:find("^autoconf/custom/") then package.loaded[name] = nil end
+    end
+
+    -- ArchHUD's setup (baseclass.lua:533-632): the classes get the databank, as argument 9
+    -- of APClass and 5 of AtlasClass; ExtraOnStart comes after both.
+    function h.setup()
+        AP = APClass(Nav, h.core, h.unit, nil, nil, nil, nil, nil, h.db)
+        ATLAS = AtlasClass(Nav, h.core, h.unit, DUSystem, h.db)
+    end
+    -- ArchHUD's start: the shim loads with the other files, then setup, then ExtraOnStart.
+    function h.start()
+        require("autoconf/custom/archhud/userclass")
+        h.setup()
+        userBase.ExtraOnStart()
     end
 
     -- script.onInputText and script.onTick, as ArchHUD.conf wires them.

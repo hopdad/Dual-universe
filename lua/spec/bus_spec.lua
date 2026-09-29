@@ -4,8 +4,7 @@ local command = require("command_helper")
 
 local function startBus(opts)
     local h = fake.install(opts)
-    require("autoconf/custom/archhud/userclass")
-    userBase.ExtraOnStart()
+    h.start()
     return h
 end
 
@@ -18,6 +17,51 @@ describe("userclass shim", function()
         end
         userBase.ExtraOnUpdate()
         userBase.ExtraOnFlush()
+    end)
+
+    it("keeps an error thrown by the bus away from ArchHUD's setup", function()
+        local h = fake.install()
+        require("autoconf/custom/archhud/userclass")
+        require("autoconf/custom/dufleet/bus").start = function() error("boom") end
+        h.setup()
+        assert.has_no.errors(function() userBase.ExtraOnStart() end)
+        assert.truthy(h.printed[#h.printed]:find("dufleet: bus error (start)", 1, true))
+    end)
+end)
+
+describe("bus in myDU's module environment", function()
+    it("never reads the handler slots, which required files cannot see", function()
+        local h = startBus()
+        for _, name in ipairs({ "system", "unit", "construct", "core", "dbHud_1" }) do
+            assert.is_nil(rawget(_G, name), name)
+        end
+        assert.are.equal(0.25, h.unitMock.timers.dub) -- the unit, through Nav.control
+        h.tick(4)
+        assert.are.equal(285.5, h.ofKind("T")[1].body.alt) -- the core, through Nav.core
+    end)
+
+    it("takes the databank from ArchHUD's class constructors", function()
+        local h = startBus()
+        h.type(command.build(1, 1, "setid", "hauler-1"))
+        h.tick(1)
+        assert.are.equal("hauler-1", h.dbMock.data["dub.id"])
+    end)
+
+    it("has no databank when ArchHUD's setup has not passed one to its constructors", function()
+        local h = fake.install()
+        require("autoconf/custom/archhud/userclass")
+        userBase.ExtraOnStart() -- no setup: the constructors never ran
+        h.tick(4)
+        assert.truthy(h.ofKind("D")[1].body.msg:find("no databank", 1, true))
+        assert.is_nil(h.dbMock.data["dub.schema"])
+    end)
+
+    it("does not start without ArchHUD's Nav, and says why", function()
+        local h = fake.install()
+        _G.Nav = nil
+        h.start()
+        assert.is_nil(h.unitMock.timers.dub)
+        assert.truthy(h.printed[1]:find("Nav.control", 1, true))
     end)
 end)
 
@@ -177,7 +221,7 @@ describe("bus", function()
 
     it("turns its own errors into D frames and keeps ArchHUD running", function()
         local h = startBus()
-        construct.getWorldPosition = function() error("sensor fault") end
+        DUConstruct.getWorldPosition = function() error("sensor fault") end
         h.tick(4)
         h.type("hello ArchHUD")
         assert.are.same({ "hello ArchHUD" }, h.archInputs)

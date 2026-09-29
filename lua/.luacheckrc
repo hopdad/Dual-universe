@@ -2,8 +2,9 @@ std = "lua53"
 max_line_length = 120
 exclude_files = { ".deps/**", "autoconf/custom/dufleet/protocol_gen.lua" }
 
--- The game and ArchHUD define these; the bus reads them.
-read_globals = { "system", "unit", "construct", "core" }
+-- The game defines these for every file. The handler slots (system, unit, construct, core,
+-- dbHud_1) are not listed: files loaded with require cannot see them.
+read_globals = { "DUSystem", "DUConstruct" }
 
 files["autoconf/custom/archhud/userclass.lua"] = {
     globals = { "userBase" },
@@ -11,7 +12,8 @@ files["autoconf/custom/archhud/userclass.lua"] = {
 
 files["spec"] = {
     std = "+busted",
-    globals = { "system", "unit", "construct", "core", "dbHud_1", "PROGRAM", "VERSION_NUMBER", "AutopilotStatus",
+    globals = { "system", "unit", "construct", "core", "dbHud_1", "DUSystem", "DUConstruct", "Nav", "AtlasClass",
+        "APClass", "PROGRAM", "VERSION_NUMBER", "AutopilotStatus",
         "Autopilot", "AltitudeHold", "BrakeIsOn", "SetupComplete", "userBase", "userScreen", "planet", "TurnBurn",
         "VectorToTarget", "spaceLaunch", "IntoOrbit", "ATLAS", "AP", "AtlasOrdered", "AutopilotTargetIndex",
         "CustomTarget", "apRoute", "galaxyReference", "vec3", "inAtmo", "atmoTanks", "spaceTanks", "rocketTanks" },

@@ -6,8 +6,8 @@
 -- hands the transport up to `lines` outbound lines. Every entry point runs under pcall,
 -- so a bus error becomes a D frame and never stops ArchHUD.
 --
--- Outbound transport for now: system.print (Transport L). The optical transport and
--- the inbox wait for ADR-0001.
+-- Outbound transport for now: DUSystem.print, into the Lua chat. ADR-0001 chose the
+-- optical frame (out) and the inbox file (in); they come next.
 
 local P = require("autoconf/custom/dufleet/protocol_gen")
 local adapter = require("autoconf/custom/dufleet/archhud_adapter")
@@ -215,6 +215,11 @@ function Bus:stop()
 end
 
 -- Entry points for the userclass shim.
+
+-- When ArchHUD loads the shim, before its setup builds the classes that receive the databank.
+function M.attach()
+    adapter.watchConstructors()
+end
 
 function M.start()
     M.instance = M.new()

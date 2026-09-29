@@ -16,6 +16,7 @@ Session 1 ran on 2026-09-28 on the owner's PC: Windows 11, one 2560×1600 monito
 | S3 | Mostly failed | Only 2 of 9 typed lines reached the Lua chat |
 | S4 | Unclear | Same run: which of the unicode, scan code and virtual key modes delivered is unknown |
 | S10 | Pass, short run | At most about 12% of the 1,000,000-instruction limit |
+| S12 | Not run | Does the bus reach the unit and core through ArchHUD's `Nav`, and the databank through ArchHUD's class constructors? Step 12 answers it: an `H` frame arrives, and no `D` frame says "no databank" |
 | S5, S6, S7 | Later: Phase 3 and `mine_loop` | |
 
 A question about DU behaviour that neither the Codex nor du-mocks answers gets a new row here, with an ID, before any code relies on an answer.

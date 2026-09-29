@@ -19,8 +19,7 @@ local function startBus(opts)
     opts = opts or {}
     opts.dbMock = opts.dbMock or databank()
     local h = fake.install(opts)
-    require("autoconf/custom/archhud/userclass")
-    userBase.ExtraOnStart()
+    h.start()
     h.flySpeed = 100000
     h.cseq = 0
     -- Types a command and runs one tick; returns the reply's kind and body.

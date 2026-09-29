@@ -83,19 +83,23 @@ function M.install(opts)
     axisCommandId = { longitudinal = 0, lateral = 1, vertical = 2 }
     axisCommandType = { unused = -1, byThrottle = 0, byTargetSpeed = 1 }
 
-    -- The game, as ArchHUD sees it: s (system), C (construct), c (core), u (unit), Nav.
-    DUSystem = { getArkTime = function() return h.clock end, getAxisValue = function() return 0 end,
-        print = function() end, setWaypoint = function() end }
-    DUConstruct = {
+    -- The game, as ArchHUD sees it: s (system), C (construct), c (core), u (unit), Nav. In the
+    -- game ArchHUD and the bus share DUSystem and DUConstruct, so ArchHUD's calls are added to
+    -- the fake's tables rather than replacing them.
+    for k, v in pairs({ getArkTime = function() return h.clock end, getAxisValue = function() return 0 end,
+        setWaypoint = function() end }) do
+        DUSystem[k] = v
+    end
+    for k, v in pairs({
         getWorldOrientationUp = function() return { 0, 0, 1 } end,
         getWorldOrientationForward = function() return { 0, 1, 0 } end,
         getWorldOrientationRight = function() return { 1, 0, 0 } end,
         getVelocity = function() return { 0, 0, 0 } end,
-        getWorldVelocity = function() return h.construct.velocity end,
-        getWorldPosition = function() return h.construct.position end,
         getMaxSpeed = function() return 50000 end,
         getMass = function() return 50000 end,
-    }
+    }) do
+        DUConstruct[k] = v
+    end
     local c = { getGravityIntensity = function() return 9.8 end, getWorldVertical = function() return { 0, 0, -1 } end,
         getAltitude = function() return 0 end }
     local u = { getThrottle = function() return 0 end, getClosestPlanetInfluence = function() return 1 end,
@@ -128,10 +132,10 @@ function M.install(opts)
     sys = galaxyReference[0]
     Kinematic = Kinematics(Nav, c, u, DUSystem, math.sqrt, math.abs)
     Kep = Keplers(Nav, c, u, DUSystem, string.format, clamp, tonumber, math.sqrt, float_eq)
-    ATLAS = AtlasClass(Nav, c, u, DUSystem, dbHud_1, atlas, nop, nop, math.floor, tonumber, math.sqrt, play, round,
+    ATLAS = AtlasClass(Nav, c, u, DUSystem, h.db, atlas, nop, nop, math.floor, tonumber, math.sqrt, play, round,
         msg)
     dofile(M.DIR .. "src/requires/apclass.lua")
-    AP = APClass(Nav, c, u, atlas, nil, nil, nil, nil, dbHud_1, math.abs, math.floor, u.getAtmosphereDensity,
+    AP = APClass(Nav, c, u, atlas, nil, nil, nil, nil, h.db, math.abs, math.floor, u.getAtmosphereDensity,
         Nav.control.isRemoteControlled, math.atan, DUSystem.getArkTime, clamp, navCom, nop, function() return false end,
         math.sqrt, round, play, addTable, float_eq, function(d) return tostring(d) end, tostring, nop, nop, msg)
 

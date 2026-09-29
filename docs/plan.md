@@ -314,16 +314,18 @@ Done on 2026-09-28:
 **You**
 
 1. Answer the open questions above. For the hub (question 1), a Supabase project of its own is the simplest choice.
-2. After item 3: step 12 of [spikes/README.md](../spikes/README.md), the real bus by hand, then a short `goto` on the same planet, with a `cancel` mid-flight.
+2. Step 12 of [spikes/README.md](../spikes/README.md): the real bus by hand, then a short `goto` on the same planet, with a `cancel` mid-flight. It also answers S12: whether the bus reaches the unit, core and databank in game.
 
 **Claude**
 
-3. Make the bus work in game. Required files cannot see the handler slots, and the bus reads them in three places:
-   - `dufleet/game.lua` reads `system`, `unit`, `construct` and `core`: use `DUSystem` and `DUConstruct`, and take the unit and the core from ArchHUD's global `Nav` (`Nav.control`, `Nav.core`);
-   - `archhud_adapter.databank()` reads `G.dbHud_1`: find the databank another way, and prove it in game first (a new spike);
-   - the shim prints a load error with `system.print`: use `DUSystem`, and run every hook under `pcall`, as the probe's shim now does.
+3. Make the bus work in game. Done offline on 2026-09-28 ([lua/README.md](../lua/README.md#how-the-bus-reaches-the-game)):
+   - `DUSystem` and `DUConstruct` instead of `system` and `construct`;
+   - the unit and the core from ArchHUD's global `Nav`;
+   - the databank caught from ArchHUD's class constructors, which receive it during setup (S12);
+   - every shim hook under `pcall`;
+   - a test harness that hides the handler slots.
 
-   Then make the fake-ArchHUD harness hide those names from the bus, as the probe's test now does, and run the Lua suites on 5.4 as well as 5.3.
+   Still to do: run the Lua suites on 5.4 as well as 5.3.
 4. Build the chosen transports behind `dufleet.transport`, with the session's fixtures ([spikes/fixtures/2026-09-28/](../spikes/fixtures/2026-09-28/)): the frame format for protocol data, the bus's `optical` and `inbox` modules, and the companion's frame reader and inbox writer.
 5. `goto`'s tolerances: A1 landed 11.5 m from its target, well inside the 50 m default. Keep `TOL_PLANET` and `TOL_SPACE` until more trips land (step 12, then Phase 2's 10 trips).
 6. Once the Supabase project exists:
