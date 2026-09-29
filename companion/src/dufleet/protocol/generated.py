@@ -83,8 +83,10 @@ SKILL_REGISTRY = {'goto': {'version': '1',
                                                  'minimum': 1,
                                                  'maximum': 100000,
                                                  'description': 'arrival tolerance in metres: horizontal on '
-                                                                'a planet, straight in space. Default 50 on '
-                                                                'a planet and 1000 in space'},
+                                                                'a planet; in space, straight and beyond the '
+                                                                'AutopilotSpaceDistance that ArchHUD stops '
+                                                                'short of the target (5000 m by default). '
+                                                                'Default 50 on a planet and 1000 in space'},
                                          'timeout': {'type': 'number',
                                                      'minimum': 10,
                                                      'maximum': 86400,

@@ -97,6 +97,27 @@ describeIf("the ArchHUD adapter against ArchHUD 2.105", function()
         assert.is_false(_G.Autopilot)
     end)
 
+    it("aims AutopilotSpaceDistance short of a custom target in space, so goto counts from there", function()
+        local f = assert(io.open(real.DIR .. "src/requires/apclass.lua"))
+        local src = f:read("a")
+        f:close()
+        assert.truthy(src:find("targetCoords = CustomTarget.position + (worldPos - CustomTarget.position)"
+            .. ":normalize()*AutopilotSpaceDistance", 1, true))
+        real.install({ at = "space" })
+        assert.are.equal(5000, adapter().spaceStopDistance()) -- ArchHUD.conf's default
+        _G.AutopilotSpaceDistance = 1500
+        assert.are.equal(1500, adapter().spaceStopDistance())
+    end)
+
+    it("engages from the air with no takeoff, and throttles up", function()
+        local h = real.install({ at = "ground" })
+        _G.abvGndDet, _G.PlayerThrottle = -1, 0 -- no ground in sight, throttle at 0 after a cancel
+        adapter().selectTarget("dub-j_1", adapter().worldFromMap(0, 2, 10, 20, 300))
+        assert.are.equal("VectorToTarget", adapter().engage(h.clock))
+        assert.is_false(_G.AutoTakeoff)
+        assert.are.equal(1, h.throttle)
+    end)
+
     it("engages the autopilot in space", function()
         local h = real.install({ at = "space" })
         local p = h.construct.position

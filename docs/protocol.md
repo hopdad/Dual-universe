@@ -202,7 +202,7 @@ run goto <job> pos=<systemId>,<bodyId>,<lat>,<lon>,<alt> [tol=<m>] [timeout=<s>]
 | Parameter | Meaning |
 |---|---|
 | `pos` | As ArchHUD reads `::pos`: degrees, and metres above sea level. Body 0 is deep space, with world x, y and z in place of lat, lon and alt |
-| `tol` | Arrival tolerance in metres, 1 to 100000. Default 50 on a planet and 1000 in space, until spike A1 measures ArchHUD's precision |
+| `tol` | Arrival tolerance in metres, 1 to 100000: horizontal on a planet; in space, straight and beyond ArchHUD's `AutopilotSpaceDistance`, which it stops short of a space target (5000 m by default). Default 50 on a planet (A1 landed 11.5 m and 4.2 m off) and 1000 in space |
 | `timeout` | Seconds of running time before the job gives up, 10 to 86400. Default 3600 |
 
 | Phase | Meaning |

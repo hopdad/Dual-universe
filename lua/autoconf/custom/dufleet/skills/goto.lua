@@ -13,9 +13,10 @@
 --           of the target; failed if it stopped further away, or is still moving after 30 s
 --
 -- On a planet ArchHUD lands under the target, so the distance there is horizontal. In
--- space it brakes to a stop near the target ("Space Arrival"), so the distance is straight.
--- The default tolerances, 50 m on a planet and 1000 m in space, stand until A1 measures
--- ArchHUD's precision. timeout (3600 s by default) counts running time, not pauses.
+-- space it brakes to a stop ("Space Arrival") AutopilotSpaceDistance short of the target
+-- (5000 m by default), so the distance is straight and tol counts beyond that distance.
+-- The default tolerances are 50 m on a planet (A1 landed 11.5 m and 4.2 m off) and 1000 m
+-- in space. timeout (3600 s by default) counts running time, not pauses.
 -- Cancel, pause, a timeout and a failed arrival all stop the autopilot and set the brake.
 --
 -- A goto does not start (E_FUEL) when a fuel type the trip needs is under dub.cfg.minfuel
@@ -170,7 +171,9 @@ function M.step(job, env, now)
         job.still = job.still or now
         if now - job.still < M.SETTLE_S then return nil end
         local data = { dist = round1(dist), t = math.floor(job.active + 0.5) }
-        if dist <= (cfg.tol or (cfg.space and M.TOL_SPACE or M.TOL_PLANET)) then return true, data end
+        local tol = cfg.tol or (cfg.space and M.TOL_SPACE or M.TOL_PLANET)
+        if cfg.space then tol = tol + env.ah.spaceStopDistance() end -- ArchHUD stops that far short
+        if dist <= tol then return true, data end
         env.ah.stop()
         return false, "E_STATE", string.format("stopped %d m from the target", math.floor(dist + 0.5)), data
     end

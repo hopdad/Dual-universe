@@ -138,6 +138,15 @@ function M.unhook()
     end
 end
 
+-- How far short of a custom target in space ArchHUD's autopilot stops: it aims at the point
+-- AutopilotSpaceDistance (an --export setting, 5000 m by default) back toward the ship
+-- (apclass.lua:1853).
+function M.spaceStopDistance()
+    local d = G.AutopilotSpaceDistance
+    if type(d) == "number" and d >= 0 then return d end
+    return 5000
+end
+
 -- The databank linked on ArchHUD's dbHud_1 slot, as its constructors received it, or nil.
 function M.databank()
     local db = databank
@@ -299,6 +308,10 @@ end
 -- Hold", apclass.lua:733-747) until the pilot throttles up and releases the brake; nothing
 -- in ArchHUD releases it by itself. The bus does both, as the pilot would. Releasing the
 -- brake keeps the takeoff: AP.BrakeToggle only cancels the autopilots when it sets one.
+--
+-- In the air, vector to target releases the brake itself on every tick
+-- (apclass.lua:2490-2491) but still waits for the pilot's throttle (ArchHUD's manual), which
+-- a cancel or a pause left at 0; the bus throttles up.
 function M.engage(now)
     local ap = G.AP
     if type(ap) ~= "table" or not ap.ToggleAutopilot then return nil, "ArchHUD's AP not found" end
@@ -311,6 +324,9 @@ function M.engage(now)
     if G.AutoTakeoff == true and G.BrakeIsOn == "ATO Hold" then
         if ap.cmdThrottle then ap.cmdThrottle(1) end
         if ap.BrakeToggle then ap.BrakeToggle() end
+    elseif G.VectorToTarget == true and G.inAtmo == true then
+        local throttle = G.PlayerThrottle
+        if not (type(throttle) == "number" and throttle > 0) and ap.cmdThrottle then ap.cmdThrottle(1) end
     end
     return mode
 end

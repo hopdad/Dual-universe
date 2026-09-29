@@ -179,6 +179,22 @@ describe("goto", function()
         assert.are.same({ false, "E_STATE", "cancelled" }, { r.ok, r.err, r.msg })
     end)
 
+    it("flies on from the air after a cancel: no takeoff, and the throttle goes back up", function()
+        local h = startBus()
+        h.flySpeed = 0
+        h.onGround = false -- in the air, where a cancel mid-flight leaves the ship
+        h.send("run", "goto", "j_1", POS)
+        assert.are.equal(1, h.throttle)
+        h.send("cancel", "j_1")
+        assert.are.equal(0, h.throttle)
+        h.tick(8) -- a toggle waits 2 s after the bus's last one
+        h.send("run", "goto", "j_2", POS)
+        h.tick(8)
+        assert.is_true(_G.VectorToTarget)
+        assert.is_false(_G.AutoTakeoff)
+        assert.are.equal(1, h.throttle)
+    end)
+
     it("pauses and resumes without an orbital hop or a second location", function()
         local h = startBus()
         h.flySpeed = 0
@@ -223,12 +239,32 @@ describe("goto", function()
     it("measures in straight lines in space, with a wider default tolerance", function()
         local h = startBus()
         _G.inAtmo, h.flySpeed, h.miss = false, 5000000, { 600, 0, 0 }
+        _G.AutopilotSpaceDistance = 0 -- ArchHUD aims at the target itself
         h.send("run", "goto", "j_1", "pos=0,0,2000000,3000000,-4000000")
         assert.are.equal("Space", _G.CustomTarget.planetname)
         assert.is_true(_G.Autopilot)
         h.tick(40)
         local r = h.result()
         assert.are.same({ true, 600 }, { r.ok, r.data.dist })
+    end)
+
+    it("arrives in space where ArchHUD stops, AutopilotSpaceDistance short of the target", function()
+        local h = startBus()
+        _G.inAtmo, h.flySpeed, h.miss = false, 5000000, { 0, 0, 0 }
+        h.send("run", "goto", "j_1", "pos=0,0,2000000,3000000,-4000000")
+        h.tick(40)
+        local r = h.result()
+        assert.are.same({ true, 5000 }, { r.ok, r.data.dist }) -- 5000 m short: ArchHUD's default
+    end)
+
+    it("fails in space when the ship stops further out than that distance plus tol", function()
+        local h = startBus()
+        _G.inAtmo, h.flySpeed, h.miss, h.spaceStop = false, 5000000, { 0, 0, 0 }, 7000
+        h.send("run", "goto", "j_1", "pos=0,0,2000000,3000000,-4000000")
+        h.tick(40)
+        local r = h.result()
+        assert.are.equal(false, r.ok)
+        assert.truthy(r.msg:find("stopped 7000 m from the target", 1, true))
     end)
 
     it("fails when the autopilot goes off and the ship keeps moving", function()

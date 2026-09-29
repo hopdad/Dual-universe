@@ -36,6 +36,8 @@ local function installAutopilot(h)
     h.flySpeed, h.miss = 2000, { 3, 4, 0 }
     h.onGround = true -- parked; ArchHUD then starts with an auto takeoff
     inAtmo = true -- ArchHUD's own flag, as its ticks set it
+    AutopilotSpaceDistance = 5000 -- an ArchHUD --export setting, at its default
+    PlayerThrottle = 0
 
     local function order()
         AtlasOrdered = {}
@@ -106,14 +108,25 @@ local function installAutopilot(h)
         if not BrakeIsOn then BrakeIsOn = true else BrakeIsOn = false end
     end
     function AP.cmdThrottle(value)
-        h.throttle = value
+        h.throttle, PlayerThrottle = value, value
     end
 
-    -- One tick of flight toward CustomTarget while ArchHUD flies.
+    -- One tick of flight toward CustomTarget while ArchHUD flies. In space ArchHUD aims
+    -- AutopilotSpaceDistance short of the target, back toward the ship (apclass.lua:1853);
+    -- h.spaceStop makes the fake stop somewhere else.
     function h.fly(dt)
         if h.flySpeed <= 0 or not CustomTarget or not (Autopilot or VectorToTarget) then return end
         if BrakeIsOn == "ATO Hold" then return end -- held on the ground until the brake is released
+        if VectorToTarget and PlayerThrottle <= 0 then return end -- waits for the pilot's throttle
         local p, t = h.construct.position, CustomTarget.position
+        if Autopilot then
+            local b = { p[1] - t.x, p[2] - t.y, p[3] - t.z }
+            local bl = math.sqrt(b[1] * b[1] + b[2] * b[2] + b[3] * b[3])
+            local stop = h.spaceStop or AutopilotSpaceDistance or 0
+            if bl > 0 then
+                t = { x = t.x + b[1] / bl * stop, y = t.y + b[2] / bl * stop, z = t.z + b[3] / bl * stop }
+            end
+        end
         local d = { t.x - p[1], t.y - p[2], t.z - p[3] }
         local len = math.sqrt(d[1] * d[1] + d[2] * d[2] + d[3] * d[3])
         local step = h.flySpeed * dt
