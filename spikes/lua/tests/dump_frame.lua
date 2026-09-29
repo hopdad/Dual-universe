@@ -3,7 +3,7 @@
 --   line 2: the SVG the probe would put in userScreen
 -- Usage: lua5.3 spikes/lua/tests/dump_frame.lua SEQ BITS [CELL X Y]
 
-local root = (arg and arg[0] or ""):match("^(.*)/tests/[^/]*$") or "spikes/lua"
+local root = (arg and arg[0] or ""):match("^(.*)[/\\]tests[/\\][^/\\]*$") or "spikes/lua"
 package.path = root .. "/?.lua;" .. package.path
 local optical = require("autoconf/custom/dufleet/optical")
 

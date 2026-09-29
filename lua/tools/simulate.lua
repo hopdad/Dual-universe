@@ -11,7 +11,7 @@
 -- Needs tools/deps.sh and dkjson. companion/tests/test_lua_bus.py feeds the batch
 -- output to the Python deframer.
 
-local root = (arg and arg[0] or ""):match("^(.*)/tools/[^/]*$") or "."
+local root = (arg and arg[0] or ""):match("^(.*)[/\\]tools[/\\][^/\\]*$") or "."
 package.path = root .. "/?.lua;" .. root .. "/spec/helpers/?.lua;" .. root .. "/.deps/du-mocks/src/?.lua;"
     .. package.path
 
