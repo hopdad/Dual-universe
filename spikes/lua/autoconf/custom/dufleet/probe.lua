@@ -1,16 +1,19 @@
 -- dufleet probe for the Phase 0 spikes A2, S0, S1, S3, S10 and S11 (see spikes/README.md).
 --
 -- Runs inside ArchHUD's control unit, loaded by archhud/userclass.lua. At start it
--- wraps two ArchHUD entry points:
+-- wraps three ArchHUD entry points:
 --   PROGRAM.controlInput  so "/b" chat lines reach the probe and never ArchHUD
 --                         (ArchHUD would treat a line containing "::pos" as a waypoint);
---   PROGRAM.onTick        so the probe gets its own "dub" timer.
+--   PROGRAM.onTick        so the probe gets its own "dub" timer;
+--   script.onTick         only to pick up the control unit (see P.start).
+-- Files loaded with require do not see the handler slots such as `system` and `unit`.
+-- Like ArchHUD's own classes (archhud/baseclass.lua), the probe uses DUSystem.
 -- Every entry point runs under pcall: a probe bug prints an error and leaves
 -- flight alone.
 
 local optical = require("autoconf/custom/dufleet/optical")
 
-local VERSION = "0.1.0"
+local VERSION = "0.1.1"
 local TIMER = "dub"
 local INBOX = "autoconf/custom/dufleet/inbox"
 local PREFIX = "@@DUB|probe|"
@@ -56,13 +59,19 @@ local st = {
 }
 
 local P = {}
+local U -- the control unit, from ArchHUD's first timer tick (see P.start)
 
 local function now()
-    return system.getUtcTime()
+    return DUSystem.getUtcTime()
 end
 
 local function icount()
-    return system.getInstructionCount()
+    return DUSystem.getInstructionCount()
+end
+
+-- Never raises, so reporting an error cannot cause another one.
+local function say(line)
+    if DUSystem then pcall(DUSystem.print, line) end
 end
 
 local function esc(s)
@@ -80,7 +89,7 @@ local function emit(kind, ...)
     for i = 1, select("#", ...) do
         parts[#parts + 1] = tostring((select(i, ...)))
     end
-    system.print(table.concat(parts, "|"))
+    DUSystem.print(table.concat(parts, "|"))
     st.prints = st.prints + 1
 end
 
@@ -90,18 +99,20 @@ local function guard(name, fn, ...)
         st.errors = st.errors + 1
         st.last_error = name .. ": " .. tostring(err)
         if st.errors <= 5 then
-            system.print("dufleet probe error (" .. name .. "): " .. tostring(err))
+            say("dufleet probe error (" .. name .. "): " .. tostring(err))
         end
     end
     return ok
 end
 
--- S11: which loading functions does the sandbox expose?
+-- S11: which loading functions does the sandbox expose? Also records which globals a
+-- required file sees: DUSystem, but not the handler slots system and unit.
 local function envReport()
     local pk = package
     local isTable = type(pk) == "table"
     return table.concat({
         "lua=" .. tostring(_VERSION),
+        "DUSystem=" .. type(DUSystem), "system=" .. type(system), "unit=" .. type(unit),
         "io=" .. type(io), "os=" .. type(os),
         "package=" .. type(pk),
         "loaded=" .. type(isTable and pk.loaded or nil),
@@ -222,7 +233,7 @@ local function onTick()
         st.next_beat = t + cfg.print_every
     end
     if #st.sweep > 0 then
-        system.print(table.remove(st.sweep, 1)) -- one sweep line per tick
+        DUSystem.print(table.remove(st.sweep, 1)) -- one sweep line per tick
         st.prints = st.prints + 1
     end
     if st.inbox_on and t >= st.inbox_next then
@@ -305,7 +316,7 @@ local function handleCommand(text)
     elseif verb == "echo" then
         emit("echo", #text, short(text, 60))
     else
-        for _, line in ipairs(HELP) do system.print(line) end
+        for _, line in ipairs(HELP) do DUSystem.print(line) end
     end
     render()
 end
@@ -317,15 +328,15 @@ function P.start()
         st.beat_until = (cfg.print_every > 0) and (st.t0 + cfg.print_for) or 0
         st.inbox_on = cfg.inbox_every > 0
         st.frame_on = cfg.frame and true or false
-        local okLimit, limit = pcall(system.getInstructionLimit)
+        local okLimit, limit = pcall(DUSystem.getInstructionLimit)
         st.limit = okLimit and limit or -1
         st.env = envReport()
 
-        local prog = PROGRAM
-        if type(prog) ~= "table" then error("ArchHUD's PROGRAM table not found") end
-        local origInput, origTick = prog.controlInput, prog.onTick
-        if type(origInput) ~= "function" or type(origTick) ~= "function" then
-            error("ArchHUD's controlInput or onTick not found")
+        local prog, scr = PROGRAM, script
+        if type(prog) ~= "table" or type(scr) ~= "table" then error("ArchHUD's PROGRAM or script table not found") end
+        local origInput, origTick, origScriptTick = prog.controlInput, prog.onTick, scr.onTick
+        if type(origInput) ~= "function" or type(origTick) ~= "function" or type(origScriptTick) ~= "function" then
+            error("ArchHUD's controlInput, onTick or script.onTick not found")
         end
         prog.controlInput = function(text)
             if type(text) == "string" and (text == "/b" or text:sub(1, 3) == "/b ") then
@@ -342,7 +353,16 @@ function P.start()
             end
             return origTick(timerId)
         end
-        unit.setTimer(TIMER, cfg.tick)
+        -- ArchHUD.conf's tick handler calls script.onTick(timerId, unit), and no other
+        -- path hands a required file the unit. ArchHUD's own 60 Hz apTick brings it here
+        -- right after start; the probe's timer starts then.
+        scr.onTick = function(timerId, u, ...)
+            if not U and u ~= nil then
+                U = u
+                guard("timer", U.setTimer, TIMER, cfg.tick)
+            end
+            return origScriptTick(timerId, u, ...)
+        end
         st.started = true
         emit("hello", "v=" .. VERSION, "limit=" .. tostring(st.limit), st.env)
         render()
@@ -353,7 +373,7 @@ function P.stop()
     guard("stop", function()
         if st.started then
             emit("bye", st.ticks, st.b_seen, st.inbox_changes, st.frame_seq)
-            unit.stopTimer(TIMER)
+            if U then U.stopTimer(TIMER) end
         end
         userScreen = nil
     end)

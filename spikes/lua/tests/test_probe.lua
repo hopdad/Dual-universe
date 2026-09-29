@@ -2,27 +2,38 @@
 -- Run from anywhere with Lua 5.3:   lua5.3 spikes/lua/tests/test_probe.lua
 -- Uses a scratch directory for the inbox file (DUFLEET_TMP, or a new temp dir).
 
-local root = (arg and arg[0] or ""):match("^(.*)/tests/[^/]*$") or "spikes/lua"
+local root = (arg and arg[0] or ""):match("^(.*)[/\\]tests[/\\][^/\\]*$") or "spikes/lua"
+local windows = package.config:sub(1, 1) == "\\"
 local tmp = os.getenv("DUFLEET_TMP")
 if not tmp then
     tmp = os.tmpname()
     os.remove(tmp)
+    if windows then tmp = os.getenv("TEMP") .. tmp:gsub("%.$", "") end -- the C runtime returns a bare "\s1a2."
 end
-assert(os.execute('mkdir -p "' .. tmp .. '/autoconf/custom/dufleet"'))
+local inbox_dir = tmp .. "/autoconf/custom/dufleet"
+if windows then -- cmd's mkdir has no -p, but it creates the parent folders anyway
+    inbox_dir = inbox_dir:gsub("/", "\\")
+    assert(os.execute('if not exist "' .. inbox_dir .. '" mkdir "' .. inbox_dir .. '"'))
+else
+    assert(os.execute('mkdir -p "' .. inbox_dir .. '"'))
+end
 package.path = tmp .. "/?.lua;" .. root .. "/?.lua;" .. package.path
 
 -- Fake game API ---------------------------------------------------------------
+-- As in the game, required files see DUSystem but not the handler slots `system`
+-- and `unit`: the unit only arrives through ArchHUD.conf's tick handler, which calls
+-- script.onTick(timerId, unit).
 local clock = 1790000000.0
 local printed = {}
 local counter = 1000
-system = {
+DUSystem = {
     print = function(s) printed[#printed + 1] = s end,
     getUtcTime = function() return clock end,
     getInstructionCount = function() counter = counter + 7 return counter end,
     getInstructionLimit = function() return 500000 end,
 }
 local timers = {}
-unit = {
+local unitSlot = {
     setTimer = function(tag, period) timers[tag] = period end,
     stopTimer = function(tag) timers[tag] = nil end,
 }
@@ -31,6 +42,8 @@ PROGRAM = {
     controlInput = function(text) archInputs[#archInputs + 1] = text end,
     onTick = function(id) archTicks[#archTicks + 1] = id end,
 }
+script = { onTick = function(h) PROGRAM.onTick(h) end } -- as ArchHUD.conf defines it
+local function fire(tag) script.onTick(tag, unitSlot) end -- the conf's tick handler
 
 -- Helpers ---------------------------------------------------------------------
 local failures = 0
@@ -50,7 +63,7 @@ end
 local function tick(n)
     for _ = 1, n do
         clock = clock + 0.25
-        PROGRAM.onTick("dub")
+        fire("dub")
     end
 end
 local function writeInbox(seq)
@@ -69,10 +82,15 @@ local probe = require("autoconf/custom/dufleet/probe")
 local st = probe._state
 
 userBase.ExtraOnStart()
-check(timers.dub == 0.25, "start sets the dub timer")
 check(#linesOf("hello") == 1, "start prints a hello line")
-check(linesOf("hello")[1]:find("package=table", 1, true) ~= nil, "hello reports the package table")
+local hello = linesOf("hello")[1] or ""
+check(hello:find("package=table", 1, true) ~= nil, "hello reports the package table")
+check(hello:find("DUSystem=table system=nil unit=nil", 1, true) ~= nil, "hello reports which globals a required file sees")
 check(type(userScreen) == "string" and userScreen:find("dufleet probe", 1, true) ~= nil, "panel is drawn")
+check(timers.dub == nil, "no timer before ArchHUD's first tick brings the unit")
+fire("apTick")
+check(timers.dub == 0.25, "ArchHUD's first tick hands over the unit and the dub timer starts")
+check(archTicks[1] == "apTick", "ArchHUD timers still reach ArchHUD")
 
 -- A2: /b lines are consumed, even with ::pos inside; everything else reaches ArchHUD
 PROGRAM.controlInput("/b ping ::pos{0,2,35.3951,104.1187,285.5413}")
@@ -82,8 +100,6 @@ PROGRAM.controlInput("/commands")
 PROGRAM.controlInput("/bogus")
 check(#archInputs == 2 and archInputs[2] == "/bogus", "non-/b lines reach ArchHUD")
 check(st.passthru == 2, "passthrough counted")
-PROGRAM.onTick("apTick")
-check(archTicks[1] == "apTick", "ArchHUD timers still reach ArchHUD")
 
 -- S0: heartbeat lines and the length sweep (first beat on the first tick, then every 2 s)
 tick(9)
@@ -142,6 +158,20 @@ PROGRAM.controlInput("/b frame on")
 local ok = pcall(tick, 2)
 optical.svg = realSvg
 check(ok and st.errors >= 1, "errors are caught and counted")
+
+-- Nothing escapes to ArchHUD, even when printing the error fails too (the first
+-- in-game run crashed ArchHUD's startup exactly that way)
+local realSys = DUSystem
+DUSystem = nil
+local okNoPrint = pcall(PROGRAM.controlInput, "/b ping")
+DUSystem = realSys
+check(okNoPrint, "an error is contained even when it cannot be printed")
+local realStart = probe.start
+probe.start = function() error("boom") end
+local okShim = pcall(userBase.ExtraOnStart)
+probe.start = realStart
+check(okShim, "the shim contains an error thrown by the probe")
+check(printed[#printed]:find("dufleet probe error (start)", 1, true) ~= nil, "the shim reports it")
 
 -- Unknown /b verbs print help; bare /b too
 local before = #printed
