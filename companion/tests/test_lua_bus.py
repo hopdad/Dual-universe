@@ -7,16 +7,15 @@ import shutil
 import subprocess
 
 import pytest
-from conftest import ROOT
+from conftest import ROOT, needs_lua_bus
 from jsonschema import Draft202012Validator
 
 from dufleet.protocol import Deframer, build_command
 
 LUA = shutil.which("lua5.3")
 SIMULATOR = ROOT / "lua" / "tools" / "simulate.lua"
-DEPS = ROOT / "lua" / ".deps" / "du-mocks"
 
-pytestmark = pytest.mark.skipif(not (LUA and DEPS.is_dir()), reason="needs lua5.3 and lua/tools/deps.sh")
+pytestmark = needs_lua_bus
 
 
 def run_bus(script: list[str]) -> list[str]:

@@ -1,10 +1,8 @@
 """dufleet run's service loop, over a transport made from the reference bus, and over the simulator."""
 
 import asyncio
-import shutil
 
-import pytest
-from conftest import ROOT
+from conftest import needs_lua_bus
 from fakes import FakeBus, FakeHub, until
 
 from dufleet import config
@@ -54,8 +52,7 @@ def test_commands_flow_until_stopped():
     asyncio.run(main())
 
 
-@pytest.mark.skipif(not (shutil.which("lua5.3") and (ROOT / "lua" / ".deps" / "du-mocks").is_dir()),
-                    reason="needs lua5.3 and lua/tools/deps.sh")
+@needs_lua_bus
 def test_the_simulator_is_a_transport():
     async def main():
         hub, stop = FakeHub(bot_id=str(CFG.bot.id)), asyncio.Event()

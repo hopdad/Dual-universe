@@ -7,11 +7,10 @@ Opt-in like test_pump_pg.py (DUFLEET_PG_TESTS=1), and needs lua5.3 and lua/tools
 import asyncio
 import contextlib
 import json
-import shutil
 import uuid
 
 import pytest
-from conftest import ROOT
+from conftest import needs_lua_bus
 from pg_hub import DB, DEVICE, OWNER, PgHub, connect_as
 
 from dufleet.pump import CommandPump
@@ -19,8 +18,7 @@ from dufleet.router import FrameRouter
 from dufleet.sim import LuaSim
 
 pytestmark = [
-    pytest.mark.skipif(not (shutil.which("lua5.3") and (ROOT / "lua" / ".deps" / "du-mocks").is_dir()),
-                       reason="needs lua5.3 and lua/tools/deps.sh"),
+    needs_lua_bus,
     pytest.mark.usefixtures("pg_database"),
 ]
 
