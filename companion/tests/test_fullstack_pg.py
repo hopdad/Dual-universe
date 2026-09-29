@@ -125,8 +125,9 @@ def test_commands_round_trip_through_the_real_bus():
 def test_a_goto_job_flies_and_finishes_its_command():
     async def main():
         c = await Chain().open()
-        # In space, 460 m from where the virtual ship starts: the fake autopilot gets there in a tick,
-        # then goto waits 5 s for the ship to settle.
+        # In space, 460 m from where the virtual ship starts. As in ArchHUD (apclass.lua:1853), the fake
+        # autopilot aims AutopilotSpaceDistance (5000 m) short of the target, back toward the ship, so it
+        # flies out to 5 km in a tick; then goto waits 5 s for the ship to settle.
         await c.queue("run", "goto", "j_fly1", "pos=0,0,-123000,98765,42")
 
         async def finished():
@@ -136,7 +137,7 @@ def test_a_goto_job_flies_and_finishes_its_command():
             await c.until(finished, timeout=20)
         row = (await c.rows())[0]
         assert (row["status"], row["error"], row["job_id"]) == ("done", None, "j_fly1")
-        assert row["result"]["dist"] == 5  # the fake stops 3 m east and 4 m north of the target
+        assert row["result"]["dist"] == 4997  # 5000 m short, and the fake misses by 3 m east and 4 m north
         cur = await c.owner.execute("select data from public.events where bot_id = %s and kind = 'skill_state'"
                                     " order by id", (c.bot,))
         moves = [(e["data"]["from"], e["data"]["to"]) for e in await cur.fetchall()]
@@ -158,7 +159,7 @@ def test_a_result_lost_in_transit_is_sent_again():
         async with running(c.pump):
             await c.until(finished, timeout=30)
         run, *rest = await c.rows()
-        assert (run["status"], run["result"]) == ("done", {"dist": 5, "t": run["result"]["t"]})
+        assert (run["status"], run["result"]) == ("done", {"dist": 4997, "t": run["result"]["t"]})
         # T frames stopped naming the job, so the pump had the hub queue a resend, and the bus sent the R again
         assert [(r["verb"], r["created_by"], r["status"]) for r in rest] == [("resend", "companion", "done")]
         assert c.pump.stats["resend requests"] == 1
