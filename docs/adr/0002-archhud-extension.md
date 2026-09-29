@@ -1,6 +1,6 @@
 # ADR-0002: Fly with ArchHUD and run the bot bus inside it
 
-- Status: Accepted, 2026-09-26. Confirm on the target server in spikes A1, A2 and S10.
+- Status: Accepted, 2026-09-26. Confirmed on the target server on 2026-09-28 (A1, A2 and S10 in [spikes.md](../spikes.md)).
 - Decides: gate D1 in [plan.md](../plan.md). Replaces the handoff's Saga fork.
 
 ## Context
@@ -36,3 +36,7 @@
 - Errors in handlers are printed, not fatal (`__wrap_lua__stopOnError=false`). A CPU overload still stops the unit, so the bus must stay light.
 - ArchHUD is GPL-3.0 and the bus runs in the same Lua VM. If the bus is ever distributed, license it GPL-3.0.
 - Every bot host needs ArchHUD and the bus installed at the pinned versions. The companion's `doctor` command checks file hashes.
+- Amended 2026-09-28, from the first in-game run ([verification.md](../verification.md#addendum-in-game-2026-09-28)):
+  - The game runs Lua 5.4, so the bus must run on 5.4 as well as 5.3.
+  - Files loaded with `require` cannot see the handler slots (`system`, `unit`, `core`, `dbHud_1`, ...). The bus reaches the game through `DUSystem` and `DUConstruct`, and the unit and core through ArchHUD's global `Nav`.
+  - An error escaping a `userBase.ExtraOn*` hook stops ArchHUD's startup, so the shim runs every hook under `pcall`.

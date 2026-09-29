@@ -1,0 +1,17 @@
+{
+  "path": "C:\\ProgramData\\My Dual Universe\\Game\\data\\lua\\autoconf\\custom\\dufleet\\inbox.lua",
+  "writes": 180,
+  "rename_retries": 0,
+  "first": [
+    {
+      "seq": 1,
+      "t": 1790646631.696
+    }
+  ],
+  "last": [
+    {
+      "seq": 180,
+      "t": 1790646811.112
+    }
+  ]
+}

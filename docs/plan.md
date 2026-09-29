@@ -12,11 +12,11 @@ Where these documents disagree with the handoff, they win.
 | Gate | Question | Status |
 |---|---|---|
 | D0 | Can a server mod run? | Decided: no. Client-only ([ADR-0003](adr/0003-client-only-track.md)) |
-| D1 | Which flight script, and where does the bot code run? | Decided: inside ArchHUD's unit, through its `userclass.lua` hook ([ADR-0002](adr/0002-archhud-extension.md)). Confirm in A1, A2 and S10 |
-| D2 | Telemetry out | Open: L (log tail) if S0 passes, otherwise O (optical frame drawn through `userScreen`) |
-| D3 | Commands in | Open: F (a local file the bus re-reads) if S11 passes, otherwise C (chat keystrokes) |
+| D1 | Which flight script, and where does the bot code run? | Decided: inside ArchHUD's unit, through its `userclass.lua` hook ([ADR-0002](adr/0002-archhud-extension.md)). Confirmed in game on 2026-09-28 (A1, A2, S10) |
+| D2 | Telemetry out | Decided: O, the optical frame drawn through `userScreen` ([ADR-0001](adr/0001-transports.md)). S0 found no log channel |
+| D3 | Commands in | Decided: F, a local file the bus re-reads ([ADR-0001](adr/0001-transports.md)). S11 passed |
 
-ADR-0001 will record D2 and D3.
+[ADR-0001](adr/0001-transports.md) records D2 and D3.
 
 ## What changes from the handoff
 
@@ -211,7 +211,7 @@ Transport adapters *(ADR-0001)*:
   - the target body is in ArchHUD's atlas (its custom atlas, on servers that change planets).
 - Start: `ATLAS.AddNewLocation("dub-" .. job, worldPos, true)` adds the target, but selects whichever location sorts first by name, so the bus then selects its own through `AtlasOrdered` and `ATLAS.UpdateAutopilotTarget()`. A single `AP.ToggleAutopilot()` engages it, at least 2 s after the bus's previous toggle: two within 1.5 s make an orbital hop.
 - Covers same-planet travel (vector to target with altitude hold, then landing), planet-to-planet flight (launch, orbit, reentry) and space targets.
-- Arrival: no travel mode, under 1 km/h for 5 s, within tolerance: horizontal on a planet (ArchHUD lands under the target), straight in space. Default tolerances 50 m and 1000 m until A1 measures ArchHUD's precision.
+- Arrival: no travel mode, under 1 km/h for 5 s, within tolerance: horizontal on a planet (ArchHUD lands under the target), straight in space. Default tolerances 50 m and 1000 m. A1 measured 11.5 m on one 2 km trip (2026-09-28); the defaults stay until more trips have landed.
 - Cancel and pause: `AP.clearAll()`, throttle 0, and the brake unless it is already set (`AP.BrakeToggle()` would release it). Confirm in A1.
 - Anything running past twice its ETA is cancelled and re-planned.
 - Done 2026-09-27 (offline): the skill runtime (`dufleet/runtime.lua`: one job, `run`, `cancel`, `pause`, `resume`, `skill_state` events, `R`, `dub.job`) and `goto` as above, against a fake ArchHUD built from the pinned source. The full-stack test flies a job through the hub SQL, pump, router and bus. See [docs/protocol.md](protocol.md), "Jobs". Needs A1 before it flies a real ship.
@@ -299,32 +299,38 @@ Answered: the server is The Third Verse, which uses its own atlas (The-Third-Ver
 1. Supabase: a new hosted project, an existing one, or self-hosted?
 2. Fleet size and hosts: spare PCs, Hyper-V GPU-P VMs, or cloud instances?
 3. The `Ai helper/` folder, which holds only an empty `Readme`: keep it, remove it, or give it a purpose?
+4. Settlers, where tests are also allowed (S9): does it use NQ's planets, The Third Verse's atlas, or its own? ArchHUD loads `autoconf/custom/atlas.lua` on every server the client joins, unless a ship's `customAtlas` parameter names another file, so the file must match the server being flown.
+5. You may later run your own server to work on a server-side mod. As its admin you could install one, which reopens [ADR-0003](adr/0003-client-only-track.md).
 
 ## Next steps
 
-From here on, sessions run on your PC. [The handoff](handoff/cloud-to-local.md) covers the setup.
+Sessions run on your PC. [The handoff](handoff/cloud-to-local.md) covers the setup.
+
+Done on 2026-09-28:
+- permission for tests on The Third Verse and Settlers (S9);
+- the repository on your PC;
+- the probe kit session, steps 1 to 11: results in [spikes.md](spikes.md), the transport decision in [ADR-0001](adr/0001-transports.md), new facts in [verification.md](verification.md#addendum-in-game-2026-09-28).
 
 **You**
 
-1. Get written permission from The Third Verse's admins for client-side automation tests (S9): screen capture, and commands typed into chat or passed through a file. Nothing runs on their server before that.
-2. Get the work onto your PC. Clone the repository and switch to `claude/handoff-verification-plan-2ftwok`, or merge that branch into `main` first. Install uv (`winget install astral-sh.uv`).
-3. Run the probe kit session: steps 1 to 11 of [spikes/README.md](../spikes/README.md). It covers S8, A1, A2, S0, S11, S1, S3, S4 and S10. Bring back:
-   - `spikes\results\summary.md`;
-   - the panel's lines and the `hello` line;
-   - how the A1 trip went, including how far from the target the ship landed;
-   - what the admins agreed to.
-4. If there is time after A1, do step 12: the real bus by hand, then a short `goto` on the same planet, with a `cancel` mid-flight.
-5. Answer the open questions above. For the hub (question 1), a Supabase project of its own is the simplest choice.
+1. Answer the open questions above. For the hub (question 1), a Supabase project of its own is the simplest choice.
+2. After item 3: step 12 of [spikes/README.md](../spikes/README.md), the real bus by hand, then a short `goto` on the same planet, with a `cancel` mid-flight.
 
-**Claude, in a session on your PC**
+**Claude**
 
-6. Record the results in [spikes.md](spikes.md), write ADR-0001 (D2 and D3), and update [verification.md](verification.md).
-7. Build the chosen transports behind `dufleet.transport`, with fixtures from the session.
-8. Set `goto`'s default tolerances from what A1 measured: `TOL_PLANET` and `TOL_SPACE` in `lua/autoconf/custom/dufleet/skills/goto.lua`, and the `tol` description in `skills.json` (then run the codegen).
-9. Once the Supabase project exists:
+3. Make the bus work in game. Required files cannot see the handler slots, and the bus reads them in three places:
+   - `dufleet/game.lua` reads `system`, `unit`, `construct` and `core`: use `DUSystem` and `DUConstruct`, and take the unit and the core from ArchHUD's global `Nav` (`Nav.control`, `Nav.core`);
+   - `archhud_adapter.databank()` reads `G.dbHud_1`: find the databank another way, and prove it in game first (a new spike);
+   - the shim prints a load error with `system.print`: use `DUSystem`, and run every hook under `pcall`, as the probe's shim now does.
+
+   Then make the fake-ArchHUD harness hide those names from the bus, as the probe's test now does, and run the Lua suites on 5.4 as well as 5.3.
+4. Build the chosen transports behind `dufleet.transport`, with the session's fixtures ([spikes/fixtures/2026-09-28/](../spikes/fixtures/2026-09-28/)): the frame format for protocol data, the bus's `optical` and `inbox` modules, and the companion's frame reader and inbox writer.
+5. `goto`'s tolerances: A1 landed 11.5 m from its target, well inside the 50 m default. Keep `TOL_PLANET` and `TOL_SPACE` until more trips land (step 12, then Phase 2's 10 trips).
+6. Once the Supabase project exists:
    - apply the migrations and the seed;
    - set up your owner user and a device user for each bot;
    - run the Phase 1 acceptance on one client.
+7. Before login and UI work: repeat S3 and S4 one mode at a time, typing more slowly (session 1 delivered 2 of 9 lines).
 
 State on 2026-09-28: the transport-independent parts of workstreams 1–6 are built and green in CI:
 - the protocol package and the skills registry;

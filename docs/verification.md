@@ -217,6 +217,8 @@ Run by [sql/run.sh](verification/sql/run.sh). "Handoff" is migrations 0001–000
 
 ## Still open, moved to spikes
 
+Session 1 (2026-09-28) answered S0, S8, S10 and part of S3 and S4: see [spikes.md](spikes.md) and the [in-game addendum](#addendum-in-game-2026-09-28).
+
 - Does `system.print` reach the disk log? (S0)
 - The myDU client's log folder, whether EQU8 ships with it, and login automation (S8)
 - `onInputText` fan-out across units, and whether a sidecar PB keeps running and receiving chat while the avatar sits in Saga's chair (S2; dropped by ADR-0002, since the bus now runs inside ArchHUD's unit)
@@ -278,7 +280,7 @@ Line numbers below refer to commit 6c95222, The-Third-Verse/ArchHUD master.
 
 `lua/spec/archhud_contract_spec.lua` checks the adapter's calls against this code. It loads the real `atlasclass.lua`, `apclass.lua` and `globals.lua` at the pinned commit, with the server's atlas, in a stubbed game. It confirms the target selection, the route precedence, the orbital hop on a quick second toggle, and the stop. It also confirms that engaging from the ground starts an auto takeoff that holds the brake (`BrakeIsOn = "ATO Hold"`).
 
-Not verified here, moved to spikes:
+Not verified here, moved to spikes (all four confirmed in session 1; see the [in-game addendum](#addendum-in-game-2026-09-28)):
 - The modular ArchHUD 2.105 build installs and flies on the target server (A1).
 - The `userclass` shim can wrap chat and timers as described (A2).
 - The myDU client's install path for local Lua files (S8).
@@ -289,3 +291,23 @@ The server's atlas, checked when the probe kit was built:
 | Repository | Commit | Date | Note |
 |---|---|---|---|
 | The-Third-Verse/AtlasFile | 48dd00f | 2025-09-12 | One `atlas.lua` (72 KB, Novaquark's atlas format, no licence file). Its README tells players to put it in `autoconf/custom/` and load it with `package.preload['atlas']`, so the `package` table is reachable from DU Lua. ArchHUD 2.105 loads `autoconf/custom/atlas.lua` by default, so no setting needs changing |
+
+## Addendum: in game, 2026-09-28
+
+Probe kit session 1 on The Third Verse, with ArchHUD 2.105 at the pinned commit ([spikes.md](spikes.md)). Line numbers refer to that commit.
+
+| Fact | Evidence |
+|---|---|
+| The client runs Lua 5.4, with an instruction limit of 1,000,000 | The probe's `hello` line (`_VERSION`, `getInstructionLimit()`) |
+| Files loaded with `require` do not see the handler slots: `system`, `unit` and the linked elements (`core`, `dbHud_1`, ...) are nil there | The probe's first run: `attempt to index a nil value (global 'system')`; `hello` line: `DUSystem=table system=nil unit=nil` |
+| They do see `DUSystem` and the globals that handler code sets, such as `PROGRAM`, `script` and `Nav`. ArchHUD's own classes use `DUSystem`, `DUPlayer`, `DUConstruct` and `DULibrary` | `hello` line; `baseclass.lua:1-5`; `baseclass.lua:590` reads `PROGRAM`, which only `ArchHUD.conf` sets |
+| Such a file gets the unit only as an argument. `ArchHUD.conf` passes it to `programClass` (as `u`), and its tick handler calls `script.onTick(timerId, unit)`, which hands only the tag on to `PROGRAM.onTick` | `ArchHUD.conf`: the `tick(timerId)` handler and `function script.onTick(h)PROGRAM.onTick(h)end` |
+| An error that escapes a `userBase.ExtraOn*` hook reaches ArchHUD's startup wrapper ("ERROR STARTUP"), and the HUD does not appear | The probe's first run |
+| `io`, `os` and `loadstring` are nil. `package` (with `loaded` and `preload`), `require`, `load`, `loadfile`, `dofile` and `debug` exist | `hello` line |
+| After `package.loaded[name] = nil`, `require` reads the file from disk again, including changes made while the unit runs | S11 |
+| `system.print` output does not reach the client's log | S0 |
+| The client logs the first load of each local file ("Found ung override for lua load of ...") but not later re-reads | Session 1's log |
+| ArchHUD calls `setAxisCommandValue` in flush. The client reports each call ("Executing a Lua method in the wrong thread ... Flush compatible:false"), about 60 times per second, still executes it, and the log grows by about 80 MB per hour | Logs of session 1 and of February 2026 |
+| Timers fire on rendered frames: a 0.25 s timer fired 3.78 times per second | Probe panel: 14,155 ticks in 3,743 s |
+| `userScreen` SVG is drawn one to one onto the screen at 2560×1600 (no scaling) | S1: a 6 px cell measured 6.00 px |
+| `ArchHUD.conf` creates the global `Nav = Navigator.new(system, core, unit)`, and the game's `Navigator.lua` keeps its arguments as `Nav.system`, `Nav.core` and `Nav.control`. So a required file can reach the core and the unit through `Nav` (from the source; not yet used in game) | `ArchHUD.conf` (onStart); `Game/data/lua/Navigator.lua:24-29` |

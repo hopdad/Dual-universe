@@ -23,11 +23,25 @@ Game API:
 - Container.updateContent and Industry.updateBank are limited to 1 call per 30 s. MiningUnit has no calibrate/start API.
 - Timer resolution is bounded by the client's framerate.
 
-Transports (ADR-0001 pending):
-- Out: L (log tail; spike S0, probably dead) or O (optical grid drawn through ArchHUD's userScreen).
-- In, one of:
-  - F: the companion writes autoconf/custom/dufleet/inbox.lua and the bus re-requires it (spike S11);
-  - C: chat keystrokes, "/b <cseq> <verb> ... #<crc16>", with the CRC over the UTF-8 bytes between "/b " and " #".
+In game (verified 2026-09-28, session 1; docs/verification.md, "Addendum: in game"):
+- The client runs Lua 5.4. getInstructionLimit() is 1,000,000.
+- Files loaded with require (all of dufleet/ and archhud/) do not see the handler slots: system, unit, core,
+  dbHud_1 and other linked elements are nil there. Use DUSystem (also DUPlayer, DUConstruct, DULibrary), as
+  ArchHUD's classes do. Globals set by handler code (PROGRAM, script, Nav) are visible. The unit arrives only
+  as an argument: ArchHUD.conf's tick handler calls script.onTick(timerId, unit).
+- An error escaping a userBase.ExtraOn* hook stops ArchHUD's startup ("ERROR STARTUP", no HUD). Run every hook
+  under pcall, and report errors with a print that cannot itself throw.
+- A 0.25 s timer fires about 3.78 times per second (it waits for a rendered frame).
+- ArchHUD's flush warnings ("wrong thread ... setAxisCommandValue") grow the client log by about 80 MB per hour.
+
+Transports (ADR-0001, 2026-09-28):
+- Out: O, an optical grid drawn through ArchHUD's userScreen and read by screen capture. Default 48x24 cells,
+  2 bits, 6 px, 2 fps (4 px at 4 fps also decoded cleanly). L is dead: system.print never reaches the log (S0).
+- In: F, the companion writes autoconf/custom/dufleet/inbox.lua (temp file, then rename) and the bus
+  re-requires it every 0.5 s after clearing package.loaded. The file returns every pending command, not just
+  the newest.
+- Chat keystrokes, "/b <cseq> <verb> ... #<crc16>" with the CRC over the UTF-8 bytes between "/b " and " #",
+  stay for manual tests; the injector is for login and menus only.
 - Server mods (system.modAction, CPPMod.*) are out of scope (ADR-0003).
 
 ArchHUD (The-Third-Verse/ArchHUD 2.105, modular master build, commit 6c95222, GPL-3.0; samedicorp/ArchHUD is the
@@ -35,7 +49,8 @@ same commit):
 - Installed as local files under Game/data/lua/autoconf/custom/ (ArchHUD.conf plus archhud/). No paste-size limit applies.
 - The BetaStandalone branch is a single-file build with no userclass hook. Never use it for bots.
 - The server is The Third Verse. Its atlas (The-Third-Verse/AtlasFile at 48dd00f) goes to autoconf/custom/atlas.lua,
-  where ArchHUD 2.105 loads it by default (customAtlas = "atlas").
+  where ArchHUD 2.105 loads it by default (customAtlas = "atlas"). Tests are also allowed on Settlers, whose
+  atlas is unchecked; the file applies on every server the client joins.
 - archhud/userclass.lua is loaded last. userBase.ExtraOnStart/Stop/Update/Flush run at the end of each event;
   userX.fn replaces a class function by name.
 - The global userScreen is added to ArchHUD's setScreen content. Nothing else may call system.setScreen on that unit.
@@ -57,10 +72,13 @@ Game files:
 - The only game files we write are archhud/userclass.lua and autoconf/custom/dufleet/, plus, at install,
   ArchHUD's own files, atlas.lua, and backups under autoconf/custom/_dufleet_backup/. Never read or modify
   client memory.
+- Files copied into autoconf/custom/ through a UAC prompt belong to Administrators; replacing them needs a
+  one-time Modify grant for the user's account (icacls, from an admin terminal). The installer checks first.
 
 ## Stack and conventions
 - lua/:
-  - Plain Lua 5.3 modules for dufleet/ plus the userclass.lua shim; no DU-LuaC project.
+  - Plain Lua modules for dufleet/ plus the userclass.lua shim; no DU-LuaC project. The game runs 5.4 and
+    CI tests on 5.3, so write code that runs on both.
   - All ArchHUD access goes through dufleet/archhud_adapter. Every entry point runs in pcall.
   - Timers only; no bot work in onUpdate/onFlush.
   - Tests: busted + du-mocks + a fake-ArchHUD harness, plus a contract spec against the real pinned ArchHUD
@@ -90,13 +108,14 @@ Game files:
   from the skills registry.
 - Conventional commits. Protocol changes bump docs/protocol.md and vectors.json.
 
-## Current phase: 0, with transport-independent Phase 1 work in parallel
-- Spikes to run first: S9, S8, A1, A2, S11, S0, S1.
+## Current phase: 1 (Phase 0's in-game session ran on 2026-09-28; docs/spikes.md, ADR-0001)
+- Next: make the bus work in game. dufleet/game.lua reads system, unit, construct and core as globals, and
+  archhud_adapter reads G.dbHud_1; all are nil for required files, but the test harness defines them. Use
+  DUSystem and DUConstruct; the unit and core are Nav.control and Nav.core (the game's Navigator.lua); the
+  databank still needs a source. Then the transports O and F ("Next steps" in plan.md).
 - The probe kit is in spikes/, with the session script in spikes/README.md. Its tests run offline:
-  cd spikes/host && uv run pytest (needs lua5.3 on PATH).
+  cd spikes/host && uv run pytest (the Lua parts need lua5.3 on PATH; they also run on Windows).
 - Pinned upstream files and their SHA-256 live in spikes/host/src/dufleet_probe/pins.py.
-- Transport adapters wait for ADR-0001. The protocol package, the hub schema, the dashboard skeleton and the Lua
-  and companion cores do not.
 - Tests: cd lua && ./tools/deps.sh && busted && luacheck . ; cd companion && uv run pytest && uv run ruff check .
   cd dashboard && npm run lint && npm run typecheck && npm test && npm run build && npm run e2e
   After a schema change: python packages/protocol/codegen.py, then (in companion/)

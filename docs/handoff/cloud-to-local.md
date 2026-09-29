@@ -51,7 +51,7 @@ For code work, the suites run here:
 | Suite | Command | On Windows |
 |---|---|---|
 | Companion | `cd companion && uv run pytest && uv run ruff check .` | Natively. The tests that run the real Lua bus skip without `lua5.3` |
-| Probe kit | `cd spikes/host && uv run pytest && uv run ruff check .` | Natively. The tests that need a Lua interpreter skip without one |
+| Probe kit | `cd spikes/host && uv run pytest && uv run ruff check .` | Natively. The tests that need a Lua interpreter skip without one, and run with a Windows Lua 5.3 on `PATH` |
 | Dashboard | `cd dashboard && npm ci && npm run lint && npm run typecheck && npm test` | Natively, with Node 22. The build and `npm run e2e` need the environment in [dashboard/README.md](../../dashboard/README.md) |
 | Lua bus | `cd lua && ./tools/deps.sh && busted && luacheck .` | In WSL (Ubuntu 24.04), set up as below |
 | Hub | `supabase/tests/run.sh` | In WSL with PostgreSQL 16, or leave it to CI. The script's header shows a throwaway cluster |
@@ -79,6 +79,14 @@ CI runs every suite on each push, so a push covers whatever the PC cannot run.
 - `dufleet sim` runs the real Lua bus in the fake ArchHUD against a hub, which is the whole chain without the game. It needs `lua5.3`.
 - The companion's PostgreSQL tests are opt-in locally: `DUFLEET_PG_TESTS=1` plus the usual `PG*` variables.
 
+## Lessons from the first local session (2026-09-28)
+
+- The offline tests passed and the probe still failed in game. The fake environment defined `system` and `unit` as globals, which files loaded with `require` never see in myDU. Test harnesses must hide the handler slots, as `spikes/lua/tests/test_probe.lua` now does.
+- The game's `autoconf\custom\` files can belong to Administrators. Installing then needs Modify rights, granted once from an admin terminal; the installer now says so before it writes anything.
+- With one monitor, screen capture needs the game in front. Retrying `optical locate` every few seconds until it finds the frame saves timing it by hand.
+- Python holds back its output in background runs; set `PYTHONUNBUFFERED=1` to watch progress.
+- In Git Bash, `grep` does not see carriage returns. Check line endings with `git ls-files --eol`, and keep scripts from writing CRLF.
+
 ## What a session on your PC can do
 
 The cloud containers could not do these:
@@ -90,6 +98,8 @@ The cloud containers could not do these:
 The rules stay the same. The only game files it writes are the ones listed under "Game files" in CLAUDE.md, and nothing reads or touches the client's memory.
 
 ## Starting the first local chat
+
+Both prompts below were used on 2026-09-28. For what comes next, see "Next steps" in [plan.md](../plan.md#next-steps).
 
 Before the in-game session:
 

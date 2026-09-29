@@ -1,0 +1,26 @@
+{
+  "region": {
+    "left": 87,
+    "top": 87,
+    "width": 362,
+    "height": 218
+  },
+  "cell_px": 6.0,
+  "elapsed_s": 120.0,
+  "captures": 1195,
+  "decoded": 1195,
+  "not_decoded": {},
+  "unique_frames": 227,
+  "clean_frames": 227,
+  "frames_per_s": 1.89,
+  "missed_frames": 0,
+  "bits_seen": {
+    "2": 1195
+  },
+  "cell_errors_mean": 0.0,
+  "cell_errors_max": 0,
+  "captures_error_free_pct": 100.0,
+  "low_confidence_mean": 0.0,
+  "decode_ms_mean": 1.15,
+  "failure_pngs": 0
+}
