@@ -20,14 +20,19 @@ jobs:
         working-directory: lua
     steps:
       - uses: actions/checkout@v7
-      - name: Install Lua 5.3, busted, luacheck and dkjson
+      - name: Install Lua 5.3 and 5.4, busted, luacheck and dkjson
         run: |
           sudo apt-get update
-          sudo apt-get install -y --no-install-recommends lua5.3 lua-busted lua-check lua-dkjson
+          sudo apt-get install -y --no-install-recommends lua5.3 lua5.4 lua-busted lua-check lua-dkjson
           sudo update-alternatives --set lua-interpreter /usr/bin/lua5.3
       - run: ./tools/deps.sh
       - run: busted
       - run: luacheck .
+      - name: busted on Lua 5.4, which the game runs
+        run: |
+          sudo update-alternatives --set lua-interpreter /usr/bin/lua5.4
+          lua -v
+          busted
 
   python:
     name: Protocol, companion and probe kit (pytest, ruff)
